@@ -10,17 +10,11 @@ Players and the DM see different things — the DM gets ephemeral (private) resp
 
 > **Replace `YOUR_CLIENT_ID` with your bot's Application ID from the [Discord Developer Portal](https://discord.com/developers/applications).**
 
-```
-https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=84992&scope=bot%20applications.commands
-```
+[![Add to Discord](https://img.shields.io/badge/Add%20to-Discord-5865F2?logo=discord&logoColor=white)](https://discord.com/api/oauth2/authorize?client_id=1507476166494392420&permissions=117760&scope=bot%20applications.commands)
 
-**Or paste this badge into your own README after filling in the ID:**
+**[→ Click here to add the bot to your server](https://discord.com/api/oauth2/authorize?client_id=1507476166494392420&permissions=117760&scope=bot%20applications.commands)**
 
-```markdown
-[![Add to Discord](https://img.shields.io/badge/Add%20to-Discord-5865F2?logo=discord&logoColor=white)](https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=84992&scope=bot%20applications.commands)
-```
-
-The permission integer `84992` grants: **View Channels + Send Messages + Embed Links + Attach Files + Read Message History** — the minimum needed for the bot to function.
+The bot requests: **View Channels · Send Messages · Embed Links · Attach Files · Read Message History**
 
 ---
 
