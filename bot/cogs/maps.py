@@ -8,6 +8,50 @@ from bot import config, db, renderer
 from bot.guard import dm_only
 from bot.generators import map_gen
 
+# Choices surfaced to Discord's autocomplete
+_TYPE_CHOICES = [
+    app_commands.Choice(name="Dungeon",    value="dungeon"),
+    app_commands.Choice(name="Outdoor",    value="outdoor"),
+    app_commands.Choice(name="Interior",   value="interior"),
+    app_commands.Choice(name="Wildemount", value="wildemount"),
+]
+
+_SUBTYPE_CHOICES = [
+    # dungeon
+    app_commands.Choice(name="Generic",           value="generic"),
+    app_commands.Choice(name="Cave",              value="cave"),
+    app_commands.Choice(name="Temple",            value="temple"),
+    app_commands.Choice(name="Ruins of Aeor",     value="ruins_aeor"),
+    app_commands.Choice(name="Underdark",         value="underdark"),
+    app_commands.Choice(name="Crypt",             value="crypt"),
+    app_commands.Choice(name="Sewers",            value="sewers"),
+    app_commands.Choice(name="Cerberus Lab",      value="cerberus_lab"),
+    app_commands.Choice(name="Bazzoxan Caverns",  value="bazzoxan"),
+    # outdoor
+    app_commands.Choice(name="Forest",            value="forest"),
+    app_commands.Choice(name="Plains",            value="plains"),
+    app_commands.Choice(name="Tundra",            value="tundra"),
+    app_commands.Choice(name="Badlands",          value="badlands"),
+    app_commands.Choice(name="Coastal",           value="coastal"),
+    app_commands.Choice(name="Jungle",            value="jungle"),
+    app_commands.Choice(name="Mountain",          value="mountain"),
+    app_commands.Choice(name="Wastes",            value="wastes"),
+    app_commands.Choice(name="Savalirwood",       value="savalirwood"),
+    # interior
+    app_commands.Choice(name="Tavern",            value="tavern"),
+    app_commands.Choice(name="Castle",            value="castle"),
+    app_commands.Choice(name="Ship",              value="ship"),
+    app_commands.Choice(name="Mansion",           value="mansion"),
+    # wildemount
+    app_commands.Choice(name="Xhorhas Wastes",    value="xhorhas_wastes"),
+    app_commands.Choice(name="Aeor Ruins",        value="aeor_ruins"),
+    app_commands.Choice(name="Rosohna",           value="rosohna"),
+    app_commands.Choice(name="Dwendalian Keep",   value="dwendalian_keep"),
+    app_commands.Choice(name="Menagerie Port",    value="menagerie_port"),
+    app_commands.Choice(name="Eiselcross",        value="eiselcross"),
+    app_commands.Choice(name="Kryn Temple",       value="kryn_temple"),
+]
+
 
 class MapsCog(commands.Cog, name="Maps"):
     def __init__(self, bot: commands.Bot):
@@ -17,6 +61,7 @@ class MapsCog(commands.Cog, name="Maps"):
     map_group = app_commands.Group(name="map", description="Map tools")
 
     @map_group.command(name="generate", description="Generate a map (DM preview only)")
+    @app_commands.choices(map_type=_TYPE_CHOICES, subtype=_SUBTYPE_CHOICES)
     @dm_only()
     async def map_generate(
         self,
@@ -41,8 +86,16 @@ class MapsCog(commands.Cog, name="Maps"):
         file = discord.File(buf, filename="map_preview.png")
         embed = discord.Embed(title=f"Map Preview — {map_name}",
                               description=f"{map_data['width']}×{map_data['height']} tiles", colour=0x3A6080)
-        embed.add_field(name="Map ID", value=str(mid), inline=True)
-        embed.add_field(name="Rooms",  value=str(len(map_data.get("rooms",[]))), inline=True)
+        embed.add_field(name="Map ID",   value=str(mid),                           inline=True)
+        embed.add_field(name="Rooms",   value=str(len(map_data.get("rooms", []))), inline=True)
+        embed.add_field(name="Size",    value=f"{map_data['width']}×{map_data['height']}", inline=True)
+        features = map_data.get("features", [])
+        if features:
+            ftypes = ", ".join({f["type"] for f in features[:6]})
+            embed.add_field(name="Features", value=ftypes, inline=False)
+        legend = map_data.get("legend", {})
+        if legend:
+            embed.add_field(name="Legend", value=" · ".join(f"{v}" for v in legend.values()), inline=False)
         embed.set_image(url="attachment://map_preview.png")
         embed.set_footer(text="Use /map share to post this to the player channel")
         await interaction.followup.send(embed=embed, file=file, ephemeral=True)

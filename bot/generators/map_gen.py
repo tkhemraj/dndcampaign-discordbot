@@ -1,5 +1,5 @@
 """
-Procedural map generation.
+Procedural map generation — ported from the dndcampaign web app generator.
 
 Tile values:
   0 = wall/void     1 = floor       2 = door
@@ -59,7 +59,7 @@ class MapResult:
 # Entry point
 # ---------------------------------------------------------------------------
 
-def generate(map_type: str, subtype: str | None, width: int = 60, height: int = 40, seed: int | None = None) -> MapResult:
+def generate(map_type: str, subtype: str | None, width: int = 80, height: int = 40, seed: int | None = None) -> MapResult:
     rng = random.Random(seed)
     if map_type == "dungeon":
         return _dungeon(subtype or "generic", width, height, rng)
@@ -76,23 +76,33 @@ def generate(map_type: str, subtype: str | None, width: int = 60, height: int = 
 # Dungeon — BSP room placement
 # ---------------------------------------------------------------------------
 
+DUNGEON_ROOM_TYPES: dict[str, list[str]] = {
+    "generic":      ["entrance", "corridor_room", "treasure", "monster_lair", "empty", "empty", "empty"],
+    "cave":         ["natural_cave", "underground_lake", "crystal_chamber", "monster_den", "hot_spring"],
+    "temple":       ["shrine", "ritual_chamber", "crypt", "offering_hall", "inner_sanctum"],
+    "ruins_aeor":   ["arcane_lab", "time_anomaly_chamber", "frozen_corridor", "collapsed_vault", "beacon_room"],
+    # Web-app subtypes
+    "underdark":    ["cave_passage", "underground_lake", "mushroom_grove", "aboleth_pool", "bioluminescent"],
+    "bazzoxan":     ["cave_passage", "underground_lake", "monster_den", "natural_cave", "crystal_chamber"],
+    "crypt":        ["burial_chamber", "crypt", "ossuary", "ritual_chamber", "collapsed_vault"],
+    "sewers":       ["sewer_junction", "overflow_chamber", "filtration_room", "access_tunnel", "rat_warren"],
+    "cerberus_lab": ["arcane_lab", "beacon_room", "time_anomaly_chamber", "collapsed_vault", "ritual_chamber"],
+}
+
 def _dungeon(subtype: str, W: int, H: int, rng: random.Random) -> MapResult:
     grid = [[0] * W for _ in range(H)]
     rooms: list[Room] = []
+    types = DUNGEON_ROOM_TYPES.get(subtype, DUNGEON_ROOM_TYPES["generic"])
 
-    ROOM_TYPES = {
-        "generic":   ["entrance", "corridor_room", "treasure", "monster_lair", "empty", "empty", "empty"],
-        "cave":      ["natural_cave", "underground_lake", "crystal_chamber", "monster_den", "hot_spring"],
-        "temple":    ["shrine", "ritual_chamber", "crypt", "offering_hall", "inner_sanctum"],
-        "ruins_aeor":["arcane_lab", "time_anomaly_chamber", "frozen_corridor", "collapsed_vault", "beacon_room"],
-    }
-    types = ROOM_TYPES.get(subtype, ROOM_TYPES["generic"])
-
+    is_sewers = subtype == "sewers"
     attempts = 0
-    while len(rooms) < 18 and attempts < 400:
+    while len(rooms) < 15 and attempts < 400:
         attempts += 1
-        w = rng.randint(4, 10)
-        h = rng.randint(4, 8)
+        # Sewers use smaller, narrower rooms
+        if is_sewers:
+            w = rng.randint(3, 7); h = rng.randint(3, 5)
+        else:
+            w = rng.randint(4, 10); h = rng.randint(4, 8)
         x = rng.randint(1, W - w - 1)
         y = rng.randint(1, H - h - 1)
         room = Room(x, y, w, h, rng.choice(types))
@@ -103,38 +113,56 @@ def _dungeon(subtype: str, W: int, H: int, rng: random.Random) -> MapResult:
             for rx in range(room.x, room.x + room.w):
                 grid[ry][rx] = 1
 
-    # Connect rooms with corridors
+    # Connect rooms with corridors; place a door at the bend
     for i in range(1, len(rooms)):
-        _corridor(grid, rooms[i - 1].cx, rooms[i - 1].cy, rooms[i].cx, rooms[i].cy, rng)
+        a, b = rooms[i - 1], rooms[i]
+        _corridor(grid, a.cx, a.cy, b.cx, b.cy, rng)
+        # Door at the corridor bend
+        if rng.random() < 0.6:
+            if rng.random() < 0.5:
+                bx, by = b.cx, a.cy
+            else:
+                bx, by = a.cx, b.cy
+            if 0 < by < H and 0 < bx < W and grid[by][bx] == 1:
+                grid[by][bx] = 2
 
     # Add doors at room entrances
     for room in rooms:
         _add_doors(grid, room, rng)
 
-    # Scatter features
-    features = []
-    for room in rooms:
-        feats = _room_features(room, rng, subtype)
-        features.extend(feats)
-        for f in feats:
-            if 0 <= f["y"] < H and 0 <= f["x"] < W:
-                grid[f["y"]][f["x"]] = f.get("tile", 9)
+    # Scatter features per room
+    features: list[dict] = []
+    for idx, room in enumerate(rooms):
+        if idx == 0:
+            # Entrance stairs
+            grid[room.cy][room.cx] = 10
+            features.append({"x": room.cx, "y": room.cy, "type": "stairs_up"})
+        elif idx == len(rooms) - 1:
+            # Boss room — chest
+            grid[room.cy][room.cx] = 9
+            features.append({"x": room.cx, "y": room.cy, "type": "chest"})
+        else:
+            feats = _room_features(room, rng, subtype, W, H, grid)
+            features.extend(feats)
+            for f in feats:
+                if 0 <= f["y"] < H and 0 <= f["x"] < W:
+                    grid[f["y"]][f["x"]] = f.get("tile", 9)
 
-    # Stairs up/down
-    if rooms:
-        fx, fy = rooms[0].cx, rooms[0].cy
-        grid[fy][fx] = 10
-        features.append({"x": fx, "y": fy, "type": "stairs_up"})
-        lx, ly = rooms[-1].cx, rooms[-1].cy
-        grid[ly][lx] = 10
-        features.append({"x": lx, "y": ly, "type": "stairs_down"})
+    legend = {
+        "0": "Wall", "1": "Floor", "2": "Door", "7": "Rubble",
+        "8": "Pillar", "9": "Chest", "10": "Stairs", "11": "Trap",
+    }
+    if subtype in ("underdark", "bazzoxan"):
+        legend["3"] = "Underground Pool"
+    if subtype == "sewers":
+        legend["3"] = "Sewer Channel"
+    if subtype == "cerberus_lab":
+        legend["9"] = "Beacon / Artefact"
 
     return MapResult(
         map_type="dungeon", subtype=subtype, width=W, height=H, tiles=grid,
         rooms=[{"x": r.x, "y": r.y, "w": r.w, "h": r.h, "type": r.room_type} for r in rooms],
-        features=features,
-        legend={"0": "Wall", "1": "Floor", "2": "Door", "7": "Rubble", "8": "Pillar",
-                "9": "Chest", "10": "Stairs", "11": "Trap"},
+        features=features, legend=legend,
     )
 
 
@@ -174,28 +202,54 @@ def _add_doors(grid, room: Room, rng: random.Random):
         grid[dy][dx] = 2
 
 
-def _room_features(room: Room, rng: random.Random, subtype: str) -> list[dict]:
+def _room_features(room: Room, rng: random.Random, subtype: str, W: int, H: int, grid: list) -> list[dict]:
     features = []
     interior_xs = range(room.x + 1, room.x + room.w - 1)
     interior_ys = range(room.y + 1, room.y + room.h - 1)
-    if not interior_xs or not interior_ys:
-        return features
     pts = [(x, y) for x in interior_xs for y in interior_ys]
     if not pts:
         return features
 
-    if room.room_type == "treasure" and rng.random() < 0.8:
+    rt = room.room_type
+
+    # Treasure / chest
+    if rt in ("treasure", "beacon_room", "collapsed_vault") and rng.random() < 0.8:
         x, y = rng.choice(pts)
         features.append({"x": x, "y": y, "type": "chest", "tile": 9})
-    if room.room_type in ("crypt", "monster_lair", "monster_den"):
+
+    # Traps
+    if rt in ("crypt", "monster_lair", "monster_den", "ossuary", "ritual_chamber") and rng.random() < 0.6:
         x, y = rng.choice(pts)
         features.append({"x": x, "y": y, "type": "trap", "tile": 11})
-    if "temple" in subtype or room.room_type in ("shrine", "ritual_chamber", "inner_sanctum"):
+
+    # Pillars (temple, shrine, inner sanctum, arcane lab)
+    if rt in ("shrine", "ritual_chamber", "inner_sanctum", "arcane_lab", "cerberus_lab", "time_anomaly_chamber"):
         for px, py in rng.sample(pts, min(4, len(pts))):
             features.append({"x": px, "y": py, "type": "pillar", "tile": 8})
-    if room.room_type == "underground_lake" and rng.random() < 0.9:
-        center = (room.cx, room.cy)
-        features.append({"x": center[0], "y": center[1], "type": "water", "tile": 3})
+
+    # Water pools — underdark / bazzoxan / sewers
+    if subtype in ("underdark", "bazzoxan") and rng.random() < 0.5:
+        for _ in range(2):
+            fx = room.x + 1 + rng.randint(0, max(0, room.w - 3))
+            fy = room.y + 1 + rng.randint(0, max(0, room.h - 3))
+            if 0 <= fy < H and 0 <= fx < W and grid[fy][fx] == 1:
+                features.append({"x": fx, "y": fy, "type": "pool", "tile": 3})
+
+    if subtype == "sewers" and room.w > 4:
+        # Water channel down the middle of the room
+        for x in range(room.x + 1, room.x + room.w - 1):
+            if 0 <= room.cy < H and 0 <= x < W and grid[room.cy][x] == 1:
+                features.append({"x": x, "y": room.cy, "type": "sewer_channel", "tile": 3})
+
+    # Crypt — rubble in corners
+    if subtype == "crypt" and rng.random() < 0.5:
+        if grid[room.y + 1][room.x + 1] == 1:
+            features.append({"x": room.x + 1, "y": room.y + 1, "type": "rubble", "tile": 7})
+
+    # Underground lake
+    if rt == "underground_lake" and rng.random() < 0.9:
+        features.append({"x": room.cx, "y": room.cy, "type": "water", "tile": 3})
+
     return features
 
 
@@ -203,59 +257,83 @@ def _room_features(room: Room, rng: random.Random, subtype: str) -> list[dict]:
 # Outdoor — zone-based terrain
 # ---------------------------------------------------------------------------
 
+OUTDOOR_CONFIGS: dict[str, dict] = {
+    "forest":       {"base": 12, "feature": 5,  "water": 3,  "road": True,  "density": 0.25},
+    "plains":       {"base": 12, "feature": 12, "water": 3,  "road": True,  "density": 0.10},
+    "tundra":       {"base": 14, "feature": 14, "water": 3,  "road": False, "density": 0.10},
+    "badlands":     {"base": 13, "feature": 7,  "water": None,"road": False, "density": 0.10},
+    "coastal":      {"base": 12, "feature": 5,  "water": 3,  "road": True,  "density": 0.12},
+    "jungle":       {"base": 12, "feature": 5,  "water": 3,  "road": False, "density": 0.30},
+    # Web-app additions
+    "mountain":     {"base": 7,  "feature": 14, "water": 3,  "road": False, "density": 0.12},
+    "wastes":       {"base": 13, "feature": 7,  "water": 4,  "road": False, "density": 0.08},
+    "savalirwood":  {"base": 12, "feature": 5,  "water": 3,  "road": False, "density": 0.28},
+}
+
 def _outdoor(subtype: str, W: int, H: int, rng: random.Random) -> MapResult:
-    CONFIGS = {
-        "forest":       {"base": 12, "feature": 5,  "water": 3,  "road": True},
-        "plains":       {"base": 12, "feature": 12, "water": 3,  "road": True},
-        "tundra":       {"base": 14, "feature": 14, "water": 3,  "road": False},
-        "badlands":     {"base": 13, "feature": 7,  "water": None,"road": False},
-        "coastal":      {"base": 12, "feature": 5,  "water": 3,  "road": True},
-        "jungle":       {"base": 12, "feature": 5,  "water": 3,  "road": False},
-    }
-    cfg = CONFIGS.get(subtype, CONFIGS["forest"])
+    cfg = OUTDOOR_CONFIGS.get(subtype, OUTDOOR_CONFIGS["forest"])
     grid = [[cfg["base"]] * W for _ in range(H)]
 
-    # Scatter terrain features (trees/rocks/etc.)
-    density = 0.25 if subtype in ("forest", "jungle") else 0.10
+    # Scatter terrain features
+    density = cfg["density"]
     for y in range(H):
         for x in range(W):
             if rng.random() < density:
                 grid[y][x] = cfg["feature"]
+    # Extra clusters
+    for _ in range(20):
+        cx = rng.randint(0, W - 1); cy = rng.randint(0, H - 1)
+        for dy in range(-1, 2):
+            for dx in range(-1, 2):
+                nx, ny = cx + dx, cy + dy
+                if 0 <= ny < H and 0 <= nx < W and rng.random() < 0.7:
+                    grid[ny][nx] = cfg["feature"]
 
-    # River / water body
+    # River / lava flow
     if cfg["water"] is not None:
-        rx = rng.randint(W // 4, 3 * W // 4)
-        for y in range(H):
-            rx = max(1, min(W - 2, rx + rng.randint(-1, 1)))
-            grid[y][rx] = cfg["water"]
-            if rng.random() < 0.4:
-                grid[y][rx + 1] = cfg["water"]
+        ry = 5 + rng.randint(0, H - 10)
+        for x in range(W):
+            ry = max(1, min(H - 2, ry + rng.randint(-1, 1)))
+            grid[ry][x] = cfg["water"]
+            if rng.random() < 0.4 and ry + 1 < H:
+                grid[ry + 1][x] = cfg["water"]
 
     # Road
     if cfg["road"]:
-        ry = rng.randint(H // 3, 2 * H // 3)
+        road_y = rng.randint(H // 3, 2 * H // 3)
         for x in range(W):
-            grid[ry][x] = 6
-            ry = max(1, min(H - 2, ry + rng.randint(-1, 1)))
+            grid[road_y][x] = 6
+            road_y = max(1, min(H - 2, road_y + rng.randint(-1, 1)))
 
+    # Scatter landmarks
     features = _scatter_outdoor_features(grid, W, H, subtype, rng)
+
+    legend = {
+        "3": "Water", "4": "Lava", "5": "Trees", "6": "Road",
+        "7": "Rubble/Rocks", "12": "Grass", "13": "Dirt/Sand", "14": "Snow/Ice",
+    }
+    if subtype == "mountain":
+        legend["7"] = "Rocky Outcrops"; legend["14"] = "Snow Caps"
+    if subtype == "wastes":
+        legend["4"] = "Lava Flow"; legend["13"] = "Blighted Soil"
+
     return MapResult(
         map_type="outdoor", subtype=subtype, width=W, height=H, tiles=grid,
-        features=features,
-        legend={"3": "Water", "5": "Trees", "6": "Road", "7": "Rubble/Rocks",
-                "12": "Grass", "13": "Dirt/Sand", "14": "Snow/Ice"},
+        features=features, legend=legend,
     )
 
 
 def _scatter_outdoor_features(grid, W, H, subtype, rng) -> list[dict]:
     features = []
-    count = rng.randint(2, 6)
+    count = rng.randint(3, 7)
     for _ in range(count):
-        x = rng.randint(2, W - 3)
-        y = rng.randint(2, H - 3)
-        ftype = rng.choice(["ruins", "campfire", "standing_stones", "ambush_point", "bridge", "cave_entrance"])
-        if subtype in ("tundra", "badlands"):
-            ftype = rng.choice(["ruins", "frozen_corpse", "strange_monolith", "campfire"])
+        x = rng.randint(2, W - 3); y = rng.randint(2, H - 3)
+        if subtype in ("tundra", "badlands", "wastes", "mountain"):
+            ftype = rng.choice(["ruins", "frozen_corpse", "strange_monolith", "campfire", "cave_entrance"])
+        elif subtype == "savalirwood":
+            ftype = rng.choice(["ancient_tree", "standing_stones", "ruins", "campfire", "fairy_ring"])
+        else:
+            ftype = rng.choice(["ruins", "campfire", "standing_stones", "ambush_point", "bridge", "cave_entrance"])
         features.append({"x": x, "y": y, "type": ftype, "tile": 7})
         grid[y][x] = 7
     return features
@@ -267,15 +345,13 @@ def _scatter_outdoor_features(grid, W, H, subtype, rng) -> list[dict]:
 
 def _interior(subtype: str, W: int, H: int, rng: random.Random) -> MapResult:
     grid = [[0] * W for _ in range(H)]
-    rooms: list[Room] = []
-    features = []
 
     TEMPLATES = {
-        "tavern":   _template_tavern,
-        "castle":   _template_castle,
-        "ship":     _template_ship,
-        "temple":   _template_temple,
-        "mansion":  _template_mansion,
+        "tavern":  _template_tavern,
+        "castle":  _template_castle,
+        "ship":    _template_ship,
+        "temple":  _template_temple,
+        "mansion": _template_mansion,
     }
     builder = TEMPLATES.get(subtype, _template_tavern)
     rooms, features = builder(grid, W, H, rng)
@@ -297,26 +373,20 @@ def _carve_room(grid, room: Room, tile=1):
 
 def _template_tavern(grid, W, H, rng):
     rooms, features = [], []
-    # Main hall
     hall = Room(2, 2, W - 4, H // 2, "common_room")
     rooms.append(hall); _carve_room(grid, hall)
-    # Bar counter as pillars
     for bx in range(hall.x + 2, hall.x + hall.w - 2, 2):
         grid[hall.y + 2][bx] = 8
-    # Upstairs rooms
     for i in range(3):
         rw, rh = 8, 6
-        rx = 2 + i * (rw + 1)
-        ry = H // 2 + 1
+        rx = 2 + i * (rw + 1); ry = H // 2 + 1
         if rx + rw < W - 1:
             r = Room(rx, ry, rw, rh, f"guest_room_{i+1}")
             rooms.append(r); _carve_room(grid, r)
             grid[ry][rx + rw // 2] = 2
-    # Cellar
     cellar = Room(W - 14, H // 2 + 1, 12, H - H // 2 - 3, "cellar")
     rooms.append(cellar); _carve_room(grid, cellar)
     grid[cellar.y][cellar.cx] = 2
-    # Front door
     grid[hall.y + hall.h - 1][hall.cx] = 2
     features.append({"x": hall.cx, "y": hall.y + 3, "type": "fireplace", "tile": 4})
     return rooms, features
@@ -324,47 +394,37 @@ def _template_tavern(grid, W, H, rng):
 
 def _template_castle(grid, W, H, rng):
     rooms, features = [], []
-    # Outer walls (thick border)
     for y in range(2, H - 2):
         for x in range(2, W - 2):
             grid[y][x] = 1
-    # Inner courtyard (void)
     for y in range(6, H - 6):
         for x in range(6, W - 6):
             grid[y][x] = 0
     rooms.append(Room(2, 2, W - 4, 4, "great_hall"))
-    # Towers at corners
     for tx, ty in [(2, 2), (W - 8, 2), (2, H - 8), (W - 8, H - 8)]:
         tr = Room(tx, ty, 6, 6, "tower")
         rooms.append(tr); _carve_room(grid, tr)
         grid[ty + 2][tx + 2] = 8; grid[ty + 2][tx + 3] = 8
-    # Throne room
     throne = Room(W // 2 - 5, 3, 10, 8, "throne_room")
     rooms.append(throne); _carve_room(grid, throne)
     grid[throne.y + throne.h - 1][throne.cx] = 2
     features.append({"x": throne.cx, "y": throne.y + 1, "type": "throne", "tile": 9})
-    # Gatehouse
     grid[H - 3][W // 2] = 2; grid[H - 3][W // 2 + 1] = 2
     return rooms, features
 
 
 def _template_ship(grid, W, H, rng):
     rooms, features = [], []
-    hw = min(W - 4, 20)
-    sx = (W - hw) // 2
-    # Hull (tapered)
+    hw = min(W - 4, 20); sx = (W - hw) // 2
     for y in range(2, H - 2):
         taper = abs(y - H // 2) * hw // (H // 2 + 1)
-        lx = sx + taper // 2
-        rx = sx + hw - taper // 2
+        lx = sx + taper // 2; rx = sx + hw - taper // 2
         for x in range(lx, rx):
             grid[y][x] = 1
-    # Mast
     mx = W // 2
     for y in range(3, H - 3):
         grid[y][mx] = 8
-    # Cabins
-    for i, (ry, rt) in enumerate([(3, "captain_cabin"), (H - 7, "cargo_hold"), (H // 2 - 2, "crew_quarters")]):
+    for ry, rt in [(3, "captain_cabin"), (H - 7, "cargo_hold"), (H // 2 - 2, "crew_quarters")]:
         r = Room(sx + 2, ry, hw - 4, 4, rt)
         rooms.append(r)
         grid[ry + 2][sx + 4] = 2
@@ -374,24 +434,19 @@ def _template_ship(grid, W, H, rng):
 
 def _template_temple(grid, W, H, rng):
     rooms, features = [], []
-    # Nave
     nave = Room(4, 4, W - 8, H - 8, "nave")
     rooms.append(nave); _carve_room(grid, nave)
-    # Pillars along the nave
     for px in range(nave.x + 2, nave.x + nave.w - 2, 3):
         grid[nave.y + 2][px] = 8
         grid[nave.y + nave.h - 3][px] = 8
-    # Altar chamber
     altar = Room(W // 2 - 5, 4, 10, 8, "altar_chamber")
     rooms.append(altar); _carve_room(grid, altar)
     grid[altar.y + altar.h - 1][altar.cx] = 2
     features.append({"x": altar.cx, "y": altar.y + 2, "type": "altar", "tile": 9})
-    # Side chapels
     for sx, rt in [(4, "side_chapel_left"), (W - 12, "side_chapel_right")]:
         chapel = Room(sx, H // 2 - 4, 8, 8, rt)
         rooms.append(chapel); _carve_room(grid, chapel)
         grid[chapel.cy][chapel.x + chapel.w - 1] = 2
-    # Front entrance
     grid[nave.y + nave.h - 1][nave.cx] = 2
     grid[nave.y + nave.h - 1][nave.cx + 1] = 2
     return rooms, features
@@ -420,20 +475,25 @@ def _template_mansion(grid, W, H, rng):
 # Wildemount-specific maps
 # ---------------------------------------------------------------------------
 
+WILDEMOUNT_SUBTYPES: dict[str, tuple[str, str]] = {
+    "xhorhas_wastes":    ("outdoor",   "badlands"),
+    "aeor_ruins":        ("dungeon",   "ruins_aeor"),
+    "rosohna_streets":   ("interior",  "mansion"),
+    "rosohna":           ("interior",  "mansion"),
+    "dwendalian_keep":   ("interior",  "castle"),
+    "menagerie_port":    ("outdoor",   "coastal"),
+    "savalirwood":       ("outdoor",   "savalirwood"),
+    "eiselcross_tundra": ("outdoor",   "tundra"),
+    "eiselcross":        ("outdoor",   "tundra"),
+    "kryn_temple":       ("interior",  "temple"),
+    "cerberus_lab":      ("dungeon",   "cerberus_lab"),
+    "cavern_bazzoxan":   ("dungeon",   "bazzoxan"),
+    "bazzoxan":          ("dungeon",   "bazzoxan"),
+    "underdark":         ("dungeon",   "underdark"),
+}
+
 def _wildemount(subtype: str, W: int, H: int, rng: random.Random) -> MapResult:
-    SUBTYPES = {
-        "xhorhas_wastes":   ("outdoor", "badlands"),
-        "aeor_ruins":       ("dungeon", "ruins_aeor"),
-        "rosohna_streets":  ("interior", "mansion"),
-        "dwendalian_keep":  ("interior", "castle"),
-        "menagerie_port":   ("outdoor", "coastal"),
-        "savalirwood":      ("outdoor", "forest"),
-        "eiselcross_tundra":("outdoor", "tundra"),
-        "kryn_temple":      ("interior", "temple"),
-        "cerberus_lab":     ("dungeon", "temple"),
-        "cavern_bazzoxan":  ("dungeon", "cave"),
-    }
-    base_type, base_sub = SUBTYPES.get(subtype, ("dungeon", "generic"))
+    base_type, base_sub = WILDEMOUNT_SUBTYPES.get(subtype, ("dungeon", "generic"))
 
     if base_type == "dungeon":
         result = _dungeon(base_sub, W, H, rng)
@@ -444,6 +504,7 @@ def _wildemount(subtype: str, W: int, H: int, rng: random.Random) -> MapResult:
 
     result.map_type = "wildemount"
     result.subtype = subtype
+
     # Inject Wildemount-flavoured feature labels
     for feat in result.features:
         if feat.get("type") == "chest" and subtype == "aeor_ruins":
@@ -452,4 +513,23 @@ def _wildemount(subtype: str, W: int, H: int, rng: random.Random) -> MapResult:
             feat["type"] = "luxon_altar"
         elif feat.get("type") == "ruins" and subtype == "xhorhas_wastes":
             feat["type"] = rng.choice(["betrayer_god_shrine", "pre_calamity_ruin", "kryn_outpost_remnant"])
+        elif feat.get("type") == "chest" and subtype == "cerberus_lab":
+            feat["type"] = rng.choice(["dunamancy_crystal", "forbidden_research", "soul_anchor"])
+
     return result
+
+
+# ---------------------------------------------------------------------------
+# Available types (for slash command choices)
+# ---------------------------------------------------------------------------
+
+MAP_TYPES: dict[str, list[str]] = {
+    "dungeon":    ["generic", "cave", "temple", "ruins_aeor", "underdark", "crypt", "sewers", "cerberus_lab", "bazzoxan"],
+    "outdoor":    ["forest", "plains", "tundra", "badlands", "coastal", "jungle", "mountain", "wastes", "savalirwood"],
+    "interior":   ["tavern", "castle", "ship", "temple", "mansion"],
+    "wildemount": [
+        "xhorhas_wastes", "aeor_ruins", "rosohna", "dwendalian_keep",
+        "menagerie_port", "savalirwood", "eiselcross", "kryn_temple",
+        "cerberus_lab", "bazzoxan",
+    ],
+}
