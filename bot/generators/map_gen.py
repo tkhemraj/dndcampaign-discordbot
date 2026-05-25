@@ -59,7 +59,13 @@ class MapResult:
 # Entry point
 # ---------------------------------------------------------------------------
 
-def generate(map_type: str, subtype: str | None, width: int = 80, height: int = 40, seed: int | None = None) -> MapResult:
+def generate(map_type: str, subtype: str | None, width: int | None = None, height: int | None = None, seed: int | None = None) -> MapResult:
+    # Smaller grids → bigger tiles → crisper output
+    if width is None or height is None:
+        if map_type in ("dungeon", "interior"):
+            width = width or 44; height = height or 32
+        else:  # outdoor, wildemount
+            width = width or 56; height = height or 38
     rng = random.Random(seed)
     if map_type == "dungeon":
         return _dungeon(subtype or "generic", width, height, rng)
