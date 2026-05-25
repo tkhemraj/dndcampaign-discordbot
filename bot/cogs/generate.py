@@ -133,7 +133,7 @@ class GenerateCog(commands.Cog, name="Generate"):
         embed.set_footer(text=f"NPC ID {npc_id} · Status: {row.get('status','alive').title()}")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @npc_group.command(name="speak", description="Ask an NPC a question and get an in-character reply (AI)")
+    @npc_group.command(name="speak", description="Ask an NPC something — reply posts to the player channel")
     @dm_only()
     async def npc_speak(self, interaction: discord.Interaction, npc_id: int, question: str):
         await interaction.response.defer(ephemeral=True)
@@ -148,13 +148,25 @@ class GenerateCog(commands.Cog, name="Generate"):
         except RuntimeError as e:
             await interaction.followup.send(f"AI dialogue unavailable: {e}", ephemeral=True)
             return
+
         embed = discord.Embed(
             description=f'*"{reply}"*',
             colour=0xD4A040,
         )
-        embed.set_author(name=f"{npc['name']} says…")
-        embed.set_footer(text=f"{npc['race']} {npc['npc_class']} · {npc.get('faction') or 'No faction'} · NPC ID {npc_id}")
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        embed.set_author(name=npc["name"])
+        embed.add_field(
+            name="",
+            value=f"> {question}",
+            inline=False,
+        )
+        embed.set_footer(
+            text=f"{npc['race']} {npc['npc_class']} · {npc.get('faction') or 'No faction'} · {npc.get('region') or 'Wildemount'}"
+        )
+
+        player_channel_id = config.get_key(interaction.guild.id, "player_channel_id")
+        target = interaction.guild.get_channel(int(player_channel_id)) if player_channel_id else interaction.channel
+        await target.send(embed=embed)
+        await interaction.followup.send(f"Posted to {target.mention}.", ephemeral=True)
 
     @npc_group.command(name="list", description="List NPCs in the active campaign")
     @app_commands.choices(status=_STATUS_CHOICES)
