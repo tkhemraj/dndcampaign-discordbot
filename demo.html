@@ -655,12 +655,12 @@
 <section class="hero">
   <div class="hero-content">
     <h1>D&amp;D Campaign<br><span>Discord Bot</span></h1>
-    <p>A fully standalone bot companion for Dungeon Masters. Live combat tracker, player character registration with spell slots, voice turn announcements, procedural NPC/quest/map generation, 185 hand-crafted library NPCs with AI in-character dialogue — all from Discord slash commands.</p>
+    <p>A fully standalone bot companion for Dungeon Masters. Autopilot combat mode lets the bot run encounters while the DM narrates — or flip to manual for social sessions. Player characters, spell slots, live combat tracker, voice announcements, procedural NPC/quest/map generation, and 185 hand-crafted library NPCs with AI dialogue — all from Discord slash commands.</p>
     <div class="hero-badges">
       <span class="badge badge-brand">⚔️ Wildemount Ready</span>
       <span class="badge badge-outline badge-dot">Live on Discord</span>
+      <span class="badge badge-outline">Autopilot Combat</span>
       <span class="badge badge-outline">185 Library NPCs</span>
-      <span class="badge badge-outline">Player Characters</span>
       <span class="badge badge-outline">Open Source</span>
     </div>
   </div>
@@ -907,25 +907,35 @@
   <div class="shipped-inner">
     <span class="shipped-label">Recently shipped</span>
     <div class="shipped-items">
+      <span class="shipped-item"><span class="si-dot"></span>Autopilot mode — bot runs combat while DM narrates</span>
+      <span class="shipped-item"><span class="si-dot"></span>Player action buttons — Attack, Cast Spell, Dodge, Pass</span>
       <span class="shipped-item"><span class="si-dot"></span>Player Characters — /pc register, spell slots, HP bar, auto-join combat</span>
-      <span class="shipped-item"><span class="si-dot"></span>Map renderer — 28px tiles, wall stone, warmth glow, torch spots, vignette</span>
-      <span class="shipped-item"><span class="si-dot"></span>/combat initiative + battle summary + 🛡️ player icons</span>
-      <span class="shipped-item"><span class="si-dot"></span>/npc kill · /quest complete · /encounter list</span>
+      <span class="shipped-item"><span class="si-dot"></span>Map renderer — 28px tiles, wall stone, warmth glow, torch spots</span>
     </div>
   </div>
 </div>
 
 <div class="features-grid">
   <div class="feature-card">
+    <div class="feature-icon">🤖</div>
+    <div class="feature-name">Autopilot Combat</div>
+    <div class="feature-desc">Two independent modes, switchable at any time. <strong>DM auto</strong>: bot rolls initiative, resolves monster attacks (with full roll narration), and advances turns — DM narrates. <strong>Player open</strong>: registered players see action buttons on their turn. Flip back to manual for social sessions.</div>
+    <div class="feature-commands">
+      <span class="cmd-chip">/setup dm_mode auto</span>
+      <span class="cmd-chip">/setup player_mode open</span>
+      <span class="cmd-chip">/setup auto_timeout</span>
+    </div>
+  </div>
+  <div class="feature-card">
     <div class="feature-icon">🗡️</div>
     <div class="feature-name">Combat Tracker</div>
-    <div class="feature-desc">Live embed posted to the player channel. Updates silently on every DM action — turn advances, HP changes, conditions, and notes. 🛡️ icons for registered player characters. Battle summary on end.</div>
+    <div class="feature-desc">Live embed posted to the player channel. Updates silently on every action — turn advances, HP changes, conditions, and notes. 🛡️ icons for registered player characters. Battle summary on end. Works in both manual and autopilot mode.</div>
     <div class="feature-commands">
       <span class="cmd-chip">/combat start</span>
       <span class="cmd-chip">/combat next</span>
+      <span class="cmd-chip">/combat done</span>
       <span class="cmd-chip">/combat hp</span>
       <span class="cmd-chip">/combat initiative</span>
-      <span class="cmd-chip">/combat condition</span>
       <span class="cmd-chip">/combat end</span>
     </div>
   </div>

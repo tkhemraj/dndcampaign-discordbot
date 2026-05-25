@@ -38,7 +38,9 @@ Configure a voice channel with `/setup voice_channel` and the bot joins automati
 
 | Feature | Commands | Who sees it |
 |---|---|---|
-| **Live combat tracker** | `/combat start/next/hp/initiative/end` | DM controls privately; players see live embed with 🛡️ player icons and battle summary on end |
+| **Autopilot combat** | `/setup dm_mode auto` | Bot auto-resolves monster attacks, rolls initiative, advances turns — DM narrates; switch to `manual` for social sessions |
+| **Player action buttons** | `/setup player_mode open` | Players see Attack / Cast Spell / Dodge / Pass buttons on their turn; `/combat done` to end turn |
+| **Live combat tracker** | `/combat start/next/hp/initiative/done/end` | DM controls privately; players see live embed with 🛡️ player icons and battle summary on end |
 | **Player characters** | `/pc register/view/list/hp/update/slots/cast/rest/inspire/retire` | Players register their own PCs; auto-join combat with correct stats; spell slot tracking |
 | **Voice turn announcements** | `/setup voice_channel` | Bot joins VC on combat start, announces each turn via TTS, disconnects on end |
 | **Deploy announcements** | automatic | Posts a green embed to player channel on every restart — shows commit SHA and what changed |
@@ -53,6 +55,7 @@ Configure a voice channel with `/setup voice_channel` and the bot joins automati
 | **Multi-campaign** | `/campaign new/select` | Multiple campaigns per server |
 | **Autocomplete everywhere** | all commands | Region, faction, difficulty, condition, status — all dropdown-driven |
 
+**Combat modes:** `dm_mode=auto` (bot runs combat) · `dm_mode=manual` (DM controls) · `player_mode=open` (action buttons) · `player_mode=managed` (DM drives)  
 **Map types:** `dungeon` · `outdoor` · `interior` · `wildemount`  
 **Dungeon subtypes:** `generic` · `underdark` · `crypt` · `sewers` · `cerberus_lab` · `bazzoxan`  
 **Dice expressions:** `1d20` · `2d6+3` · `4d6kh3` · `1d20 adv` · `1d20 dis` · `2d8-1`
@@ -85,6 +88,56 @@ Run these as the DM after adding the bot:
 /setup voice_channel  #General             ← optional: VC for combat TTS announcements
 /campaign new         "The Wildemount War" ← creates and activates a campaign
 /setup status                              ← confirm everything is wired up
+```
+
+---
+
+## Autopilot mode
+
+The bot has two independent mode axes, switchable at any time:
+
+### DM mode
+
+| Mode | Behaviour |
+|---|---|
+| `manual` (default) | DM calls `/combat next` for every turn |
+| `auto` | Bot auto-resolves monster turns, rolls initiative, announces turns — DM focuses on narration |
+
+```
+/setup dm_mode auto    ← flip on for combat-heavy encounters
+/setup dm_mode manual  ← flip back for social/RP sessions
+```
+
+In **auto** mode:
+- `/combat start` rolls initiative for every combatant automatically (d20 + DEX modifier)
+- Monster turns: bot picks the lowest-HP player, rolls attack vs AC, applies damage, posts the result embed, advances turn — all without DM input
+- DM can still call `/combat next` at any time to force-skip a turn (overrides the auto-resolve)
+
+### Player mode
+
+| Mode | Behaviour |
+|---|---|
+| `managed` (default) | DM handles all character actions; players observe |
+| `open` | Players see action buttons on their turn and can end it themselves |
+
+```
+/setup player_mode open    ← players get buttons on their turn
+/setup player_mode managed ← DM manages everything
+```
+
+In **open** mode, when it's a registered PC's turn the bot posts four buttons in the player channel:
+- **⚔️ Attack** → dropdown of live enemies → rolls attack + damage
+- **🔮 Cast Spell** → uses lowest available slot → rolls slot_level × 1d8 damage → deducts slot
+- **🛡️ Dodge** → adds Dodging condition, advances turn
+- **⏭️ Pass** → skips turn
+
+Players can also type `/combat done` to end their own turn.
+
+### Turn timeout
+
+```
+/setup auto_timeout 5   ← auto-skip stalled player turns after 5 minutes
+/setup auto_timeout 0   ← disable (wait indefinitely)
 ```
 
 ---
@@ -149,8 +202,9 @@ Both gates can be active simultaneously — useful for having a `#dm-commands` c
 
 | Command | Description |
 |---|---|
-| `/combat start <encounter_id> [with_party]` | Start combat — posts live embed to player channel; `with_party:True` auto-imports registered PCs with correct HP/AC |
-| `/combat next` | Advance turn (embed updates live) |
+| `/combat start <encounter_id> [with_party]` | Start combat — posts live embed to player channel; `with_party:True` auto-imports registered PCs; auto-rolls initiative in `dm_mode=auto` |
+| `/combat next` | Advance turn (embed updates live; also unblocks autopilot for player turns) |
+| `/combat done` | Player ends their own turn — only works when `player_mode=open` and it's your registered PC's turn |
 | `/combat hp <name> <delta>` | Heal or damage (`+5`, `-12`) |
 | `/combat initiative <name> <value>` | Set or override a combatant's initiative |
 | `/combat add <name> <hp> [ac] [initiative]` | Add combatant mid-fight |
@@ -227,7 +281,10 @@ HP bar displays as `█████░░░░░` (10-block bar). Registered P
 | `/setup dm_channel <channel>` | Set the DM-only text channel |
 | `/setup player_channel <channel>` | Set the player text channel |
 | `/setup voice_channel <channel>` | Set the voice channel for combat TTS announcements |
-| `/setup status` | Show current configuration |
+| `/setup dm_mode <auto\|manual>` | Set DM mode — `auto` for autopilot, `manual` for DM-controlled |
+| `/setup player_mode <open\|managed>` | Set player mode — `open` for action buttons, `managed` for DM-controlled |
+| `/setup auto_timeout <minutes>` | Minutes before stalled player turn auto-skips (0 = disabled) |
+| `/setup status` | Show current configuration including all mode settings |
 
 </details>
 
