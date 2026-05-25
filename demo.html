@@ -565,10 +565,11 @@
 <section class="hero">
   <div class="hero-content">
     <h1>D&amp;D Campaign<br><span>Discord Bot</span></h1>
-    <p>A fully standalone bot companion for Dungeon Masters. Live combat tracker, voice channel turn announcements, procedural NPC/quest/map generation, and deploy notifications — all from Discord slash commands.</p>
+    <p>A fully standalone bot companion for Dungeon Masters. Live combat tracker, voice turn announcements, procedural NPC/quest/map generation, 185 hand-crafted library NPCs with AI in-character dialogue — all from Discord slash commands.</p>
     <div class="hero-badges">
       <span class="badge badge-brand">⚔️ Wildemount Ready</span>
       <span class="badge badge-outline badge-dot">Live on Discord</span>
+      <span class="badge badge-outline">185 Library NPCs</span>
       <span class="badge badge-outline">Open Source</span>
     </div>
   </div>
@@ -611,9 +612,9 @@
 </div>
 
 <!-- ── NPC DEMO ──────────────────────────────────────────────────────── -->
-<div class="section-label">Generation</div>
-<h2 class="section-title">Procedural NPC Generator</h2>
-<p class="section-desc">Every NPC is fully statted with Wildemount lore — race, class, faction, ability scores, personality, ideals, bonds, flaws, and a backstory seeded to the setting.</p>
+<div class="section-label">Generation · Library · AI Dialogue</div>
+<h2 class="section-title">NPCs with Personality</h2>
+<p class="section-desc">Generate fully statted Wildemount NPCs on the fly — or browse 185 hand-crafted library characters (Legendary to Standard). Summon any of them into your campaign and ask them questions. They answer in character, with or without an API key.</p>
 
 <div class="discord-shell" id="npcShell">
   <div class="d-sidebar"><div class="d-server-icon">D</div></div>
@@ -792,10 +793,10 @@
   <div class="shipped-inner">
     <span class="shipped-label">Recently shipped</span>
     <div class="shipped-items">
-      <span class="shipped-item"><span class="si-dot"></span>Autocomplete dropdowns on all commands</span>
-      <span class="shipped-item"><span class="si-dot"></span>/npc view &lt;id&gt; — retrieve any saved NPC</span>
-      <span class="shipped-item"><span class="si-dot"></span>Encounter names built from roster</span>
-      <span class="shipped-item"><span class="si-dot"></span>/npc speak — AI in-character dialogue</span>
+      <span class="shipped-item"><span class="si-dot"></span>185 hand-crafted library NPCs (Legendary → Standard)</span>
+      <span class="shipped-item"><span class="si-dot"></span>/npc library — browse + filter by tier &amp; region</span>
+      <span class="shipped-item"><span class="si-dot"></span>/npc summon — pull any library NPC into your campaign</span>
+      <span class="shipped-item"><span class="si-dot"></span>/npc speak — AI dialogue · works without any API key</span>
     </div>
   </div>
 </div>
@@ -815,10 +816,13 @@
   </div>
   <div class="feature-card">
     <div class="feature-icon">🧙</div>
-    <div class="feature-name">NPC Generator</div>
-    <div class="feature-desc">Full Wildemount-flavoured NPCs with stats, personalities, ideals, bonds, flaws, and backstories. Saved to the campaign database — pull any NPC back up mid-session by ID.</div>
+    <div class="feature-name">NPC Generator + Library</div>
+    <div class="feature-desc">Procedural NPCs with full Wildemount stats, or browse 185 hand-crafted characters — 5 Legendary, 10 Mega, 20 Notable, 150 Standard. Summon any into your campaign and ask them questions. AI dialogue via Anthropic, OpenAI-compatible, Ollama, or zero-dependency template fallback.</div>
     <div class="feature-commands">
       <span class="cmd-chip">/npc generate</span>
+      <span class="cmd-chip">/npc library</span>
+      <span class="cmd-chip">/npc summon</span>
+      <span class="cmd-chip">/npc speak</span>
       <span class="cmd-chip">/npc view</span>
       <span class="cmd-chip">/npc list</span>
     </div>
@@ -932,15 +936,6 @@
         <div class="roadmap-title">Dice Roller with Roll History</div>
         <div class="roadmap-desc">Full dice expression parser: <code>/roll 4d6kh3</code>, <code>/roll 1d20+5 adv</code>. Results posted to player channel. The DM gets secret rolls. Track roll history per session for dispute resolution.</div>
         <span class="roadmap-tag rt-qol">Quality of Life</span>
-      </div>
-    </div>
-
-    <div class="roadmap-card">
-      <div class="roadmap-icon ri-player">🧝</div>
-      <div class="roadmap-body">
-        <div class="roadmap-title">Player Character Registration</div>
-        <div class="roadmap-desc">Players register their own characters with <code>/character create</code>. Characters auto-join combat with correct stats, track their own HP, and appear in the tracker with a player icon rather than a monster icon.</div>
-        <span class="roadmap-tag rt-player">Player-Facing</span>
       </div>
     </div>
 
@@ -1223,47 +1218,85 @@ async function runNpcDemo() {
   const container = document.getElementById('npcMessages');
   await sleep(400);
 
-  const npcs = [
-    {
-      id: 12, name: 'Elara Veth', race: 'Half-Elf', cls: 'Cobalt Soul Expositor', level: 7,
-      alignment: 'Neutral Good', faction: 'Cobalt Soul', region: 'Western Wynandir',
-      hp: 56, ac: 14,
-      str: 10, dex: 16, con: 12, int: 18, wis: 15, cha: 11,
-      personality: 'Speaks very quietly and expects everyone to lean in.',
-      ideal: 'Knowledge: Every question has an answer. I intend to find all of them.',
-      flaw: 'Harbours a secret sympathy for the enemy faction that would destroy her reputation.',
-      backstory: 'Cobalt Soul expositor who was "retired" after her investigation got too close to an archmage. She carries evidence that could bring down a sitting Assembly member — and someone knows it.',
-    },
-    {
-      id: 13, name: 'Thar\'vok Meen', race: 'Kryn Drow', cls: 'Echo Knight', level: 9,
-      alignment: 'Lawful Neutral', faction: 'Kryn Dynasty', region: 'Xhorhas',
-      hp: 84, ac: 18,
-      str: 18, dex: 13, con: 16, int: 10, wis: 12, cha: 9,
-      personality: 'Never backs down from a challenge, even when they should.',
-      ideal: 'The Dynasty: The Luxon\'s light will eventually reach every corner of Wildemount.',
-      flaw: 'Will not ask for help, even when dying.',
-      backstory: 'A consecuted Kryn warrior in their third life — the other two lives belonged to an Imperial soldier. The memories bleed through at the worst moments.',
-    },
-  ];
+  // 1 — Browse the library
+  container.appendChild(dmMsg('<span class="slash-cmd">/npc library</span> tier: Legendary', 0));
+  container.scrollTop = container.scrollHeight;
+  await sleep(700);
 
-  for (let i = 0; i < npcs.length; i++) {
-    const npc = npcs[i];
-    const cmd = i === 0
-      ? '<span class="slash-cmd">/npc generate</span> region: Western Wynandir faction: Cobalt Soul'
-      : '<span class="slash-cmd">/npc generate</span> region: Xhorhas faction: Kryn Dynasty';
+  const libraryEmbed = `<div class="embed gold">
+    <div class="embed-title">NPC Library — 5 characters</div>
+    <div class="embed-desc" style="margin-bottom:10px">Use <code>/npc summon &lt;name&gt;</code> to add one to your campaign.</div>
+    <div class="embed-fields">
+      <div class="embed-field full"><div class="embed-field-name">🔥 Seraphina Coldmourne</div><div class="embed-field-value">Human Wizard · Cerberus Assembly · Western Wynandir</div></div>
+      <div class="embed-field full"><div class="embed-field-name">🔥 Korath-Dul</div><div class="embed-field-value">Drow Fighter · None · Xhorhas</div></div>
+      <div class="embed-field full"><div class="embed-field-name">🔥 High Curator Mira Ashveil</div><div class="embed-field-value">Human Monk · Cobalt Soul · Western Wynandir</div></div>
+      <div class="embed-field full"><div class="embed-field-name">🔥 Valdris the Index</div><div class="embed-field-value">Halfling Rogue · Myriad · Menagerie Coast</div></div>
+      <div class="embed-field full"><div class="embed-field-name">🔥 General Callista Dawnbreaker</div><div class="embed-field-value">Human Fighter · Dwendalian Empire · Eastern Wynandir</div></div>
+    </div>
+    <div class="embed-footer">Showing 5 of 5</div>
+  </div>
+  <div class="msg-ephemeral">🔒 Only you can see this</div>`;
+  container.appendChild(botMsg(libraryEmbed, 0));
+  container.scrollTop = container.scrollHeight;
+  await sleep(3200);
 
-    container.appendChild(dmMsg(cmd, 0));
-    container.scrollTop = container.scrollHeight;
-    await sleep(800);
+  // 2 — Summon a legendary NPC
+  container.appendChild(dmMsg('<span class="slash-cmd">/npc summon</span> name: Seraphina Coldmourne', 0));
+  container.scrollTop = container.scrollHeight;
+  await sleep(700);
 
-    const reply = botMsg(
-      buildNpcEmbed(npc) + `<div class="msg-ephemeral">🔒 Only you can see this</div>`,
-      0
-    );
-    container.appendChild(reply);
-    container.scrollTop = container.scrollHeight;
-    await sleep(3500);
-  }
+  const seraphina = {
+    id: 14, name: 'Seraphina Coldmourne', race: 'Human', cls: 'Wizard (Necromancy)', level: 14,
+    alignment: 'Lawful Evil', faction: 'Cerberus Assembly', region: 'Western Wynandir',
+    hp: 97, ac: 14,
+    str: 9, dex: 13, con: 14, int: 20, wis: 15, cha: 16,
+    personality: 'Unfailingly polite; uses courtesy as a weapon.',
+    ideal: 'Power: The arcane hierarchy exists for a reason. I intend to reach its summit.',
+    flaw: 'Holds physical proof of a soul-harvesting operation — and cannot decide whether to use it or destroy it.',
+    backstory: 'A senior Volstrucker agent who secretly compiled evidence of an illegal soul-harvesting operation run by her own superiors.',
+  };
+  const summonEmbed = buildNpcEmbed(seraphina);
+  container.appendChild(botMsg(
+    summonEmbed.replace('Saved as NPC ID 14 · Only visible to you', 'Library NPC (Legendary) · Saved as ID 14 · Use /npc speak 14') +
+    '<div class="msg-ephemeral">🔒 Only you can see this</div>', 0
+  ));
+  container.scrollTop = container.scrollHeight;
+  await sleep(3800);
+
+  // 3 — Speak to the NPC (posts publicly to session-log)
+  container.appendChild(dmMsg('<span class="slash-cmd">/npc speak</span> id: 14  question: What faction do you actually serve?', 0));
+  container.scrollTop = container.scrollHeight;
+  await sleep(900);
+
+  const speakEmbed = `<div class="embed" style="border-color:#7060a0">
+    <div class="embed-title">🎭 Seraphina Coldmourne speaks</div>
+    <div class="embed-desc" style="font-style:italic;color:#c0b0e0">&gt; "What faction do you actually serve?"</div>
+    <div class="embed-desc" style="margin-top:8px">"The Assembly has my contract. Whether it has my loyalty is a more interesting question — and not one I answer in places where the answer travels."</div>
+    <div class="embed-footer">Seraphina Coldmourne · Wizard · Cerberus Assembly · Western Wynandir</div>
+  </div>`;
+  container.appendChild(botMsg(speakEmbed, 0));
+  container.scrollTop = container.scrollHeight;
+  await sleep(3200);
+
+  // 4 — Procedural NPC for contrast
+  container.appendChild(dmMsg('<span class="slash-cmd">/npc generate</span> region: Xhorhas faction: Kryn Dynasty', 0));
+  container.scrollTop = container.scrollHeight;
+  await sleep(700);
+
+  const thar = {
+    id: 15, name: "Thar'vok Meen", race: 'Kryn Drow', cls: 'Echo Knight', level: 9,
+    alignment: 'Lawful Neutral', faction: 'Kryn Dynasty', region: 'Xhorhas',
+    hp: 84, ac: 18,
+    str: 18, dex: 13, con: 16, int: 10, wis: 12, cha: 9,
+    personality: 'Never backs down from a challenge, even when they should.',
+    ideal: "Dynasty: The Luxon's light will reach every corner of Wildemount.",
+    flaw: 'Will not ask for help, even when dying.',
+    backstory: "A consecuted Kryn warrior in their third life — the other two belonged to an Imperial soldier. The memories bleed through at the worst moments.",
+  };
+  container.appendChild(botMsg(
+    buildNpcEmbed(thar) + '<div class="msg-ephemeral">🔒 Only you can see this</div>', 0
+  ));
+  container.scrollTop = container.scrollHeight;
 }
 
 // ── Voice demo ───────────────────────────────────────────────────────────────

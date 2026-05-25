@@ -1,6 +1,6 @@
 # D&D Campaign Discord Bot
 
-A fully standalone Discord bot companion for Dungeon Masters running campaigns in **Wildemount** (Critical Role setting). Live combat tracker with HP bars and conditions, procedural NPC/quest/map generation, voice channel turn announcements, and deploy notifications — all from Discord slash commands.
+A fully standalone Discord bot companion for Dungeon Masters running campaigns in **Wildemount** (Critical Role setting). Live combat tracker with HP bars and conditions, procedural NPC/quest/map generation, 185 hand-crafted library NPCs with AI in-character dialogue, voice channel turn announcements, and deploy notifications — all from Discord slash commands.
 
 [![Add to Discord](https://img.shields.io/badge/Add%20to-Discord-5865F2?logo=discord&logoColor=white)](https://discord.com/api/oauth2/authorize?client_id=1507476166494392420&permissions=117760&scope=bot%20applications.commands)
 [![Live Demo](https://img.shields.io/badge/Live-Demo-7289da?logo=github)](https://tkhemraj.github.io/dndcampaign-discordbot/demo.html)
@@ -15,8 +15,8 @@ The DM controls combat privately. Players see a live embed that updates every tu
 
 ![Combat Tracker](docs/img/combat_tracker.png)
 
-### NPC Generator
-Every NPC is fully statted with Wildemount lore — race, class, faction, ability scores, personality, ideals, flaws, and a backstory seeded to the setting. Replies are ephemeral (DM-only).
+### NPC Generator + Library
+Generate fully statted Wildemount NPCs on the fly, or browse 185 hand-crafted library characters — 5 Legendary, 10 Mega, 20 Notable, 150 Standard. Summon any into your campaign with `/npc summon`, then ask them questions with `/npc speak`. AI dialogue auto-selects from Anthropic, OpenAI-compatible endpoints, Ollama, or a zero-dependency template fallback that requires no API key. All generation replies are ephemeral (DM-only); `/npc speak` replies post publicly to the player channel.
 
 ![NPC Generator](docs/img/npc_generator.png)
 
@@ -41,7 +41,8 @@ Configure a voice channel with `/setup voice_channel` and the bot joins automati
 | **Live combat tracker** | `/combat start/next/hp/end` | DM controls privately; players see live embed |
 | **Voice turn announcements** | `/setup voice_channel` | Bot joins VC on combat start, announces each turn via TTS, disconnects on end |
 | **Deploy announcements** | automatic | Posts a green embed to player channel on every restart — shows commit SHA and what changed |
-| **NPC generation** | `/npc generate`, `/npc view`, `/npc list` | DM only (ephemeral) — fully statted, Wildemount lore, saved to DB |
+| **NPC generation + library** | `/npc generate`, `/npc library`, `/npc summon`, `/npc view`, `/npc list` | DM only (ephemeral) — procedural or hand-crafted library (185 NPCs: 5 Legendary, 10 Mega, 20 Notable, 150 Standard) |
+| **AI NPC dialogue** | `/npc speak <id> <question>` | Posts in-character reply to player channel — Anthropic, OpenAI-compatible, Ollama, or zero-dependency template fallback |
 | **Quest board** | `/quest generate`, `/quest board` | DM generates; board posts to player channel |
 | **Procedural maps** | `/map generate`, `/map share` | DM previews privately; share posts PNG to channel |
 | **Session recaps** | `/session log` | Posts rich embed to player channel |
@@ -114,6 +115,9 @@ Both gates can be active simultaneously — useful for having a `#dm-commands` c
 | Command | Description |
 |---|---|
 | `/npc generate [region] [faction]` | Generate + save a fully statted NPC (ephemeral) — region and faction are dropdown-autocompleted |
+| `/npc library [tier] [region]` | Browse the 185-NPC hand-crafted library — filter by tier (Legendary/Mega/Notable/Standard) or region |
+| `/npc summon <name>` | Pull any library NPC into your campaign DB with freshly rolled stats |
+| `/npc speak <id> <question>` | Ask a saved NPC a question — AI reply posted publicly to player channel (Anthropic → OpenAI-compat → Ollama → template) |
 | `/npc view <id>` | View a saved NPC's full stat card by ID |
 | `/npc list [status]` | List saved NPCs (status: Alive / Dead / Unknown) |
 | `/quest generate [region] [faction]` | Generate + save a quest hook (ephemeral) — region and faction are dropdown-autocompleted |
