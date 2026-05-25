@@ -383,10 +383,12 @@ class GenerateCog(commands.Cog, name="Generate"):
         for c in enc.get("combatants", []):
             db.execute(
                 """INSERT INTO combatants
-                   (encounter_id,name,combatant_type,initiative,hp,max_hp,ac,conditions,notes)
-                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                   (encounter_id,name,combatant_type,initiative,hp,max_hp,ac,atk_bonus,damage_dice,conditions,notes)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
                 (eid, c["name"], c.get("combatant_type","monster"), 0,
-                 c["hp"], c["max_hp"], c["ac"], c.get("conditions","[]"), c.get("notes","")),
+                 c["hp"], c["max_hp"], c["ac"],
+                 c.get("atk_bonus", 2), c.get("damage_dice", "1d6"),
+                 c.get("conditions","[]"), c.get("notes","")),
             )
         embed = discord.Embed(
             title=enc.get("name","Encounter"),

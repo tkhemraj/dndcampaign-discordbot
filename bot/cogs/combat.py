@@ -1,14 +1,27 @@
-"""Combat tracker — live embed in player channel, DM controls."""
+"""Combat tracker — live embed in player channel, DM controls.
+
+Modes
+-----
+dm_mode = "manual"  (default) — DM calls /combat next for every turn.
+dm_mode = "auto"              — Bot auto-resolves monster turns, prompts
+                                players; DM narrates.
+
+player_mode = "managed" (default) — DM manages all character actions.
+player_mode = "open"              — Players see action buttons on their
+                                    turn; /combat done available.
+"""
 from __future__ import annotations
 import asyncio
 import json
 import os
+import random
 import tempfile
 import discord
 from discord import app_commands
 from discord.ext import commands
 from bot import config, db
-from bot.guard import dm_only
+from bot.guard import dm_only, is_dm
+
 
 _active: dict[int, "_Tracker"] = {}
 
@@ -21,8 +34,9 @@ _CONDITION_CHOICES = [
 ]
 
 
+# ── TTS helpers ──────────────────────────────────────────────────────────────
+
 def _tts_to_file(text: str) -> str:
-    """Generate TTS MP3 via gTTS and return a temp file path. Runs in thread executor."""
     from gtts import gTTS
     tts = gTTS(text=text, lang="en", slow=False)
     tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
@@ -31,7 +45,6 @@ def _tts_to_file(text: str) -> str:
 
 
 async def _speak(vc: discord.VoiceClient, text: str) -> None:
-    """Play a TTS announcement on an already-connected VoiceClient."""
     if vc is None or not vc.is_connected():
         return
     try:
@@ -48,12 +61,252 @@ async def _speak(vc: discord.VoiceClient, text: str) -> None:
     vc.play(discord.FFmpegPCMAudio(path), after=_after)
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _get_pc_for_combatant(combatant: dict, guild_id: int) -> dict | None:
+    cid = config.get_key(guild_id, "active_campaign_id")
+    if not cid:
+        return None
+    return db.fetchone(
+        "SELECT * FROM player_characters WHERE campaign_id=? AND name=? AND status='active'",
+        (cid, combatant["name"]),
+    )
+
+
+# ── Discord UI — player action buttons ───────────────────────────────────────
+
+class _TargetSelect(discord.ui.Select):
+    """Target dropdown used inside both Attack and Spell flows."""
+
+    def __init__(
+        self,
+        tracker: "_Tracker",
+        attacker: dict,
+        pc_row: dict | None,
+        action: str,
+        player_uid: str | None,
+        monsters: list[dict],
+    ):
+        self.tracker    = tracker
+        self.attacker   = attacker
+        self.pc_row     = pc_row
+        self.action     = action       # "attack" | "spell_N"
+        self.player_uid = player_uid
+        options = [
+            discord.SelectOption(
+                label=f"{c['name']} — HP {c['hp']}/{c['max_hp']} AC {c['ac']}",
+                value=str(c["id"]),
+            )
+            for c in monsters
+        ]
+        super().__init__(placeholder="Choose your target…", options=options,
+                         min_values=1, max_values=1)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if self.player_uid and str(interaction.user.id) != str(self.player_uid):
+            await interaction.response.send_message("This isn't your turn.", ephemeral=True)
+            return
+        await interaction.response.defer()
+
+        from bot.engine import (
+            resolve_attack, calc_player_attack_bonus, calc_player_damage_dice, roll_dice
+        )
+
+        tid    = int(self.values[0])
+        target = db.fetchone("SELECT * FROM combatants WHERE id=?", (tid,))
+        if not target or not target["is_active"]:
+            await interaction.followup.send("That target is no longer available.", ephemeral=True)
+            return
+
+        if self.action == "attack":
+            atk = self.attacker.get("atk_bonus") or (
+                calc_player_attack_bonus(self.pc_row) if self.pc_row else 3
+            )
+            dmg = self.attacker.get("damage_dice") or (
+                calc_player_damage_dice(self.pc_row) if self.pc_row else "1d8"
+            )
+            result = resolve_attack(int(atk), target["ac"], dmg)
+
+            if result["hit"]:
+                new_hp = max(0, target["hp"] - result["damage"])
+                db.execute("UPDATE combatants SET hp=? WHERE id=?", (new_hp, tid))
+                if new_hp == 0:
+                    db.execute("UPDATE combatants SET is_active=0 WHERE id=?", (tid,))
+                dmg_str  = "+".join(str(r) for r in result["dmg_rolls"])
+                crit_tag = " 💥 **CRITICAL HIT!**" if result["crit"] else ""
+                desc   = (
+                    f"⚔️ **{self.attacker['name']}** attacks **{target['name']}**{crit_tag}\n"
+                    f"`{result['d20']}` + `{atk}` = **{result['total']}** "
+                    f"vs AC **{target['ac']}** → ✅ HIT\n"
+                    f"Damage: `{dmg_str}` = **{result['damage']}** hp"
+                )
+                colour = 0x44AA44
+            else:
+                desc   = (
+                    f"⚔️ **{self.attacker['name']}** attacks **{target['name']}**\n"
+                    f"`{result['d20']}` + `{atk}` = **{result['total']}** "
+                    f"vs AC **{target['ac']}** → ❌ MISS"
+                )
+                colour = 0x666666
+            embed = discord.Embed(description=desc, colour=colour)
+
+        else:  # "spell_N"
+            slot_level = int(self.action.split("_")[1])
+            all_rolls, total_dmg = [], 0
+            for _ in range(slot_level):
+                rolls, t = roll_dice("1d8")
+                all_rolls.extend(rolls)
+                total_dmg += t
+            new_hp = max(0, target["hp"] - total_dmg)
+            db.execute("UPDATE combatants SET hp=? WHERE id=?", (new_hp, tid))
+            if new_hp == 0:
+                db.execute("UPDATE combatants SET is_active=0 WHERE id=?", (tid,))
+            if self.pc_row:
+                slots = json.loads(self.pc_row.get("spell_slots") or "{}")
+                key = str(slot_level)
+                if key in slots and isinstance(slots[key], list):
+                    slots[key][0] = max(0, slots[key][0] - 1)
+                db.execute(
+                    "UPDATE player_characters SET spell_slots=? WHERE id=?",
+                    (json.dumps(slots), self.pc_row["id"]),
+                )
+            rolls_str = "+".join(str(r) for r in all_rolls)
+            desc  = (
+                f"🔮 **{self.attacker['name']}** casts a level {slot_level} spell "
+                f"at **{target['name']}**\n"
+                f"Damage: `{rolls_str}` = **{total_dmg}** hp"
+            )
+            embed = discord.Embed(description=desc, colour=0x8844FF)
+
+        await self.tracker._refresh_embed()
+        await interaction.followup.send(embed=embed)
+        await self.tracker.advance_turn()
+        await self.tracker._cleanup_action_msg()
+        self.tracker.signal_next()
+        if self.view:
+            self.view.stop()
+
+
+class CombatActionView(discord.ui.View):
+    """Attack / Cast Spell / Dodge / Pass buttons shown to a player on their turn."""
+
+    def __init__(
+        self,
+        tracker: "_Tracker",
+        cur: dict,
+        pc_row: dict | None,
+        channel,
+        player_uid: str | None,
+    ):
+        super().__init__(timeout=300)
+        self.tracker    = tracker
+        self.cur        = cur
+        self.pc_row     = pc_row
+        self.channel    = channel
+        self.player_uid = player_uid
+
+    async def _check_user(self, interaction: discord.Interaction) -> bool:
+        if self.player_uid and str(interaction.user.id) != str(self.player_uid):
+            await interaction.response.send_message("This isn't your turn.", ephemeral=True)
+            return False
+        return True
+
+    def _available_slot_level(self) -> int | None:
+        if not self.pc_row:
+            return None
+        slots = json.loads(self.pc_row.get("spell_slots") or "{}")
+        for lvl in sorted(slots.keys(), key=int):
+            entry = slots[lvl]
+            remaining = entry[0] if isinstance(entry, list) else int(entry)
+            if remaining > 0:
+                return int(lvl)
+        return None
+
+    @discord.ui.button(label="⚔️ Attack", style=discord.ButtonStyle.danger)
+    async def attack(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._check_user(interaction):
+            return
+        monsters = [c for c in self.tracker.combatants() if c["combatant_type"] == "monster"]
+        if not monsters:
+            await interaction.response.send_message("No valid targets.", ephemeral=True)
+            return
+        tview = discord.ui.View(timeout=120)
+        tview.add_item(_TargetSelect(
+            self.tracker, self.cur, self.pc_row, "attack", self.player_uid, monsters
+        ))
+        await interaction.response.edit_message(
+            content=f"**{self.cur['name']}** — choose your target:", view=tview
+        )
+        self.stop()
+
+    @discord.ui.button(label="🔮 Cast Spell", style=discord.ButtonStyle.blurple)
+    async def cast_spell(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._check_user(interaction):
+            return
+        slot_level = self._available_slot_level()
+        if slot_level is None:
+            await interaction.response.send_message("No spell slots remaining!", ephemeral=True)
+            return
+        monsters = [c for c in self.tracker.combatants() if c["combatant_type"] == "monster"]
+        if not monsters:
+            await interaction.response.send_message("No valid targets.", ephemeral=True)
+            return
+        tview = discord.ui.View(timeout=120)
+        tview.add_item(_TargetSelect(
+            self.tracker, self.cur, self.pc_row, f"spell_{slot_level}",
+            self.player_uid, monsters,
+        ))
+        await interaction.response.edit_message(
+            content=f"**{self.cur['name']}** — spell target (level {slot_level} slot):",
+            view=tview,
+        )
+        self.stop()
+
+    @discord.ui.button(label="🛡️ Dodge", style=discord.ButtonStyle.secondary)
+    async def dodge(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._check_user(interaction):
+            return
+        conditions = json.loads(self.cur.get("conditions") or "[]")
+        if "Dodging" not in conditions:
+            conditions.append("Dodging")
+        db.execute("UPDATE combatants SET conditions=? WHERE id=?",
+                   (json.dumps(conditions), self.cur["id"]))
+        await interaction.response.defer()
+        if self.channel:
+            await self.channel.send(embed=discord.Embed(
+                description=f"🛡️ **{self.cur['name']}** takes the Dodge action.",
+                colour=0x4488FF,
+            ))
+        await self.tracker._refresh_embed()
+        await self.tracker.advance_turn()
+        await self.tracker._cleanup_action_msg()
+        self.tracker.signal_next()
+        self.stop()
+
+    @discord.ui.button(label="⏭️ Pass", style=discord.ButtonStyle.secondary)
+    async def pass_turn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._check_user(interaction):
+            return
+        await interaction.response.defer()
+        if self.channel:
+            await self.channel.send(f"⏭️ **{self.cur['name']}** passes their turn.")
+        await self.tracker.advance_turn()
+        await self.tracker._cleanup_action_msg()
+        self.tracker.signal_next()
+        self.stop()
+
+
+# ── Tracker ───────────────────────────────────────────────────────────────────
+
 class _Tracker:
     def __init__(self, encounter_id: int, guild_id: int, player_message: discord.Message):
-        self.encounter_id = encounter_id
-        self.guild_id = guild_id
+        self.encounter_id  = encounter_id
+        self.guild_id      = guild_id
         self.player_message = player_message
         self.vc: discord.VoiceClient | None = None
+        self._auto_task: asyncio.Task | None = None
+        self._next_event: asyncio.Event      = asyncio.Event()
+        self._action_msg: discord.Message | None = None
 
     def combatants(self) -> list[dict]:
         return db.fetchall(
@@ -78,12 +331,12 @@ class _Tracker:
         return combatants[enc["current_turn"] % len(combatants)]
 
     def build_embed(self) -> discord.Embed:
-        enc = self.encounter()
+        enc        = self.encounter()
         combatants = self.combatants()
-        cur = self.current()
-        embed = discord.Embed(title=f"⚔️  {enc['name']}", colour=0xCC2222)
-        embed.add_field(name="Round",  value=str(enc["round"]),        inline=True)
-        embed.add_field(name="Status", value=enc["status"].title(),    inline=True)
+        cur        = self.current()
+        embed      = discord.Embed(title=f"⚔️  {enc['name']}", colour=0xCC2222)
+        embed.add_field(name="Round",  value=str(enc["round"]),      inline=True)
+        embed.add_field(name="Status", value=enc["status"].title(),  inline=True)
 
         lines = []
         for c in combatants:
@@ -92,8 +345,8 @@ class _Tracker:
             hp, max_hp = c["hp"], c["max_hp"]
             bar  = "█" * round((hp / max_hp) * 10 if max_hp else 0)
             bar += "░" * (10 - len(bar))
-            arrow    = "▶ " if cur and c["id"] == cur["id"] else "   "
-            name     = f"**{c['name']}**" if cur and c["id"] == cur["id"] else c["name"]
+            arrow     = "▶ " if cur and c["id"] == cur["id"] else "   "
+            name      = f"**{c['name']}**" if cur and c["id"] == cur["id"] else c["name"]
             type_icon = "🛡️" if c.get("combatant_type") == "player" else ""
             lines.append(f"{arrow}{type_icon}{name} — HP {hp}/{max_hp} `{bar}` AC {c['ac']}{cond_str}")
             if c.get("notes"):
@@ -101,11 +354,161 @@ class _Tracker:
         for c in self.fallen():
             lines.append(f"   ~~{c['name']}~~ 💀")
 
-        embed.add_field(name="Initiative Order", value="\n".join(lines) or "_No combatants_", inline=False)
+        embed.add_field(name="Initiative Order",
+                        value="\n".join(lines) or "_No combatants_", inline=False)
         if cur:
             embed.set_footer(text=f"Current: {cur['name']} · Initiative {cur['initiative']}")
         return embed
 
+    async def advance_turn(self) -> None:
+        enc        = self.encounter()
+        combatants = self.combatants()
+        if not enc or not combatants:
+            return
+        next_turn  = enc["current_turn"] + 1
+        next_round = enc["round"]
+        if next_turn >= len(combatants):
+            next_turn  = 0
+            next_round += 1
+        db.execute(
+            "UPDATE encounters SET current_turn=?, round=? WHERE id=?",
+            (next_turn, next_round, self.encounter_id),
+        )
+        await self._refresh_embed()
+
+    async def _refresh_embed(self) -> None:
+        try:
+            await self.player_message.edit(embed=self.build_embed())
+        except discord.NotFound:
+            _active.pop(self.guild_id, None)
+
+    async def _cleanup_action_msg(self) -> None:
+        if self._action_msg:
+            try:
+                await self._action_msg.delete()
+            except Exception:
+                pass
+            self._action_msg = None
+
+    def signal_next(self) -> None:
+        self._next_event.set()
+
+    def stop(self) -> None:
+        if self._auto_task and not self._auto_task.done():
+            self._auto_task.cancel()
+
+
+# ── Autopilot loop ────────────────────────────────────────────────────────────
+
+async def _resolve_monster_attack(tracker: _Tracker, cur: dict, channel) -> None:
+    from bot.engine import resolve_attack
+    players = [c for c in tracker.combatants() if c["combatant_type"] == "player"]
+    if not players:
+        return
+    target    = min(players, key=lambda c: c["hp"])
+    atk_bonus = cur.get("atk_bonus") or 2
+    dmg_dice  = cur.get("damage_dice") or "1d6"
+    result    = resolve_attack(int(atk_bonus), target["ac"], dmg_dice)
+
+    if result["hit"]:
+        new_hp = max(0, target["hp"] - result["damage"])
+        db.execute("UPDATE combatants SET hp=? WHERE id=?", (new_hp, target["id"]))
+        if new_hp == 0:
+            db.execute("UPDATE combatants SET is_active=0 WHERE id=?", (target["id"],))
+        dmg_str  = "+".join(str(r) for r in result["dmg_rolls"])
+        crit_tag = " 💥 **CRITICAL HIT!**" if result["crit"] else ""
+        desc   = (
+            f"🗡️ **{cur['name']}** attacks **{target['name']}**{crit_tag}\n"
+            f"`{result['d20']}` + `{atk_bonus}` = **{result['total']}** "
+            f"vs AC **{target['ac']}** → ✅ HIT\n"
+            f"Damage: `{dmg_str}` = **{result['damage']}** hp"
+        )
+        colour = 0xCC2222
+    else:
+        desc   = (
+            f"🗡️ **{cur['name']}** attacks **{target['name']}**\n"
+            f"`{result['d20']}` + `{atk_bonus}` = **{result['total']}** "
+            f"vs AC **{target['ac']}** → ❌ MISS"
+        )
+        colour = 0x666666
+
+    if channel:
+        await channel.send(embed=discord.Embed(description=desc, colour=colour))
+
+
+async def _auto_run(tracker: _Tracker, bot: commands.Bot) -> None:
+    """Autopilot — runs for the duration of combat when dm_mode='auto'."""
+    gid   = tracker.guild_id
+    guild = bot.get_guild(gid)
+    if not guild:
+        return
+
+    try:
+        while gid in _active:
+            enc = tracker.encounter()
+            if not enc or enc["status"] != "active":
+                break
+
+            cur = tracker.current()
+            if not cur:
+                break
+
+            player_mode = config.get_key(gid, "player_mode") or "managed"
+            timeout_min = config.get_key(gid, "auto_turn_timeout")
+            if timeout_min is None:
+                timeout_min = 5
+
+            pcid = config.get_key(gid, "player_channel_id")
+            ch   = guild.get_channel(int(pcid)) if pcid else None
+
+            if cur["combatant_type"] == "monster":
+                expected = enc["current_turn"]
+                await asyncio.sleep(1.5)
+                if gid not in _active:
+                    break
+                enc_now = tracker.encounter()
+                if enc_now["current_turn"] != expected:
+                    continue  # DM manually advanced during the pause — skip auto-resolve
+                await _resolve_monster_attack(tracker, cur, ch)
+                await tracker.advance_turn()
+                if tracker.vc:
+                    nxt = tracker.current()
+                    if nxt:
+                        enc2 = tracker.encounter()
+                        await _speak(tracker.vc, f"{nxt['name']}, round {enc2['round']}.")
+
+            else:
+                tracker._next_event.clear()
+                pc_row     = _get_pc_for_combatant(cur, gid)
+                player_uid = pc_row["discord_user_id"] if pc_row else None
+
+                if player_mode == "open":
+                    view    = CombatActionView(tracker, cur, pc_row, ch, player_uid)
+                    content = f"⚔️ **{cur['name']}'s turn!**"
+                    if ch:
+                        await tracker._cleanup_action_msg()
+                        tracker._action_msg = await ch.send(content=content, view=view)
+                else:
+                    if ch:
+                        await ch.send(embed=discord.Embed(
+                            description=f"⏳ **{cur['name']}'s turn** — awaiting action",
+                            colour=0x4488FF,
+                        ))
+
+                try:
+                    timeout_secs = timeout_min * 60 if timeout_min > 0 else None
+                    await asyncio.wait_for(tracker._next_event.wait(), timeout=timeout_secs)
+                except asyncio.TimeoutError:
+                    if ch:
+                        await ch.send(f"⏭️ *{cur['name']} passes (timed out after {timeout_min}m).*")
+                    await tracker._cleanup_action_msg()
+                    await tracker.advance_turn()
+
+    except asyncio.CancelledError:
+        pass
+
+
+# ── Cog ───────────────────────────────────────────────────────────────────────
 
 class CombatCog(commands.Cog, name="Combat"):
     def __init__(self, bot: commands.Bot):
@@ -113,11 +516,8 @@ class CombatCog(commands.Cog, name="Combat"):
 
     combat_group = app_commands.Group(name="combat", description="Combat tracker")
 
-    async def _refresh(self, tracker: _Tracker):
-        try:
-            await tracker.player_message.edit(embed=tracker.build_embed())
-        except discord.NotFound:
-            _active.pop(tracker.guild_id, None)
+    async def _refresh(self, tracker: _Tracker) -> None:
+        await tracker._refresh_embed()
 
     @combat_group.command(name="start", description="Start a combat encounter")
     @app_commands.describe(
@@ -125,18 +525,28 @@ class CombatCog(commands.Cog, name="Combat"):
         with_party="Auto-add registered PCs to this combat (default True)",
     )
     @dm_only()
-    async def combat_start(self, interaction: discord.Interaction,
-                           encounter_id: int, with_party: bool = True):
+    async def combat_start(
+        self, interaction: discord.Interaction,
+        encounter_id: int, with_party: bool = True,
+    ):
         gid = interaction.guild.id
         if gid in _active:
-            await interaction.response.send_message("Combat already running. Use /combat end first.", ephemeral=True)
+            await interaction.response.send_message(
+                "Combat already running. Use /combat end first.", ephemeral=True
+            )
             return
         enc = db.fetchone("SELECT * FROM encounters WHERE id=?", (encounter_id,))
         if not enc:
-            await interaction.response.send_message(f"No encounter {encounter_id}.", ephemeral=True)
+            await interaction.response.send_message(
+                f"No encounter {encounter_id}.", ephemeral=True
+            )
             return
-        db.execute("UPDATE encounters SET status='active', round=1, current_turn=0 WHERE id=?", (encounter_id,))
-        # Auto-import registered PCs as player-type combatants
+
+        db.execute(
+            "UPDATE encounters SET status='active', round=1, current_turn=0 WHERE id=?",
+            (encounter_id,),
+        )
+
         if with_party:
             cid = config.get_key(gid, "active_campaign_id")
             if cid:
@@ -150,15 +560,41 @@ class CombatCog(commands.Cog, name="Combat"):
                         (encounter_id, pc["name"]),
                     )
                     if not already:
+                        from bot.engine import calc_player_attack_bonus, calc_player_damage_dice
                         db.execute(
-                            "INSERT INTO combatants (encounter_id,name,combatant_type,initiative,hp,max_hp,ac,conditions,notes) VALUES (?,?,?,?,?,?,?,?,?)",
+                            "INSERT INTO combatants "
+                            "(encounter_id,name,combatant_type,initiative,hp,max_hp,ac,"
+                            "atk_bonus,damage_dice,conditions,notes) "
+                            "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                             (encounter_id, pc["name"], "player", 0,
-                             pc["hp"], pc["max_hp"], pc["ac"], "[]", ""),
+                             pc["hp"], pc["max_hp"], pc["ac"],
+                             calc_player_attack_bonus(pc),
+                             calc_player_damage_dice(pc),
+                             "[]", ""),
                         )
+
+        dm_mode = config.get_key(gid, "dm_mode") or "manual"
+        if dm_mode == "auto":
+            from bot.engine import roll_initiative
+            all_combatants = db.fetchall(
+                "SELECT * FROM combatants WHERE encounter_id=?", (encounter_id,)
+            )
+            for c in all_combatants:
+                dex = 10
+                if c["combatant_type"] == "player":
+                    pc = _get_pc_for_combatant(c, gid)
+                    if pc:
+                        dex = pc.get("dex_score", 10)
+                init = roll_initiative(dex)
+                db.execute("UPDATE combatants SET initiative=? WHERE id=?", (init, c["id"]))
+
         player_channel_id = config.get_key(gid, "player_channel_id")
-        target = interaction.guild.get_channel(int(player_channel_id)) if player_channel_id else interaction.channel
+        target = (
+            interaction.guild.get_channel(int(player_channel_id))
+            if player_channel_id else interaction.channel
+        )
         await interaction.response.defer(ephemeral=True)
-        msg = await target.send(embed=discord.Embed(title="Preparing combat…", colour=0xCC2222))
+        msg     = await target.send(embed=discord.Embed(title="Preparing combat…", colour=0xCC2222))
         tracker = _Tracker(encounter_id, gid, msg)
         _active[gid] = tracker
         await self._refresh(tracker)
@@ -174,14 +610,22 @@ class CombatCog(commands.Cog, name="Combat"):
                         tracker.vc = existing
                     else:
                         tracker.vc = await vc_channel.connect()
-                    cur = tracker.current()
-                    name = cur["name"] if cur else "unknown"
+                    cur      = tracker.current()
+                    name     = cur["name"] if cur else "unknown"
                     enc_name = enc["name"]
                     await _speak(tracker.vc, f"Combat has begun. {enc_name}. {name} goes first.")
                 except Exception:
                     pass
 
-        await interaction.followup.send(f"Combat started in {target.mention}.", ephemeral=True)
+        if dm_mode == "auto":
+            tracker._auto_task = asyncio.create_task(_auto_run(tracker, self.bot))
+            mode_note = " — **Autopilot active** (monsters auto-resolve)"
+        else:
+            mode_note = ""
+
+        await interaction.followup.send(
+            f"Combat started in {target.mention}.{mode_note}", ephemeral=True
+        )
 
     @combat_group.command(name="next", description="Advance to the next turn")
     @dm_only()
@@ -190,21 +634,50 @@ class CombatCog(commands.Cog, name="Combat"):
         if not tracker:
             await interaction.response.send_message("No active combat.", ephemeral=True)
             return
-        enc = tracker.encounter()
-        combatants = tracker.combatants()
-        next_turn = enc["current_turn"] + 1
-        next_round = enc["round"]
-        if next_turn >= len(combatants):
-            next_turn = 0
-            next_round += 1
-        db.execute("UPDATE encounters SET current_turn=?, round=? WHERE id=?",
-                   (next_turn, next_round, tracker.encounter_id))
-        await self._refresh(tracker)
+        await tracker.advance_turn()
         cur = tracker.current()
-        await interaction.response.send_message(f"→ **{cur['name'] if cur else '?'}**", ephemeral=True)
+        await interaction.response.send_message(
+            f"→ **{cur['name'] if cur else '?'}**", ephemeral=True
+        )
+        tracker.signal_next()
         if cur and tracker.vc:
             enc = tracker.encounter()
             await _speak(tracker.vc, f"{cur['name']}, round {enc['round']}.")
+
+    @combat_group.command(name="done", description="End your turn (requires player_mode: open)")
+    async def combat_done(self, interaction: discord.Interaction):
+        gid = interaction.guild.id
+        if config.get_key(gid, "player_mode") != "open":
+            await interaction.response.send_message(
+                "Player mode is not set to `open`. Ask your DM to use `/setup player_mode open`.",
+                ephemeral=True,
+            )
+            return
+        tracker = _active.get(gid)
+        if not tracker:
+            await interaction.response.send_message("No active combat.", ephemeral=True)
+            return
+        cur = tracker.current()
+        if not cur or cur["combatant_type"] != "player":
+            await interaction.response.send_message(
+                "It's not a player's turn.", ephemeral=True
+            )
+            return
+        cid = config.get_key(gid, "active_campaign_id")
+        if cid:
+            pc = db.fetchone(
+                "SELECT * FROM player_characters WHERE campaign_id=? AND name=? AND status='active'",
+                (cid, cur["name"]),
+            )
+            if pc and str(pc["discord_user_id"]) != str(interaction.user.id):
+                await interaction.response.send_message("It's not your turn.", ephemeral=True)
+                return
+        await interaction.response.send_message(
+            f"Ending **{cur['name']}'s** turn.", ephemeral=True
+        )
+        await tracker.advance_turn()
+        await tracker._cleanup_action_msg()
+        tracker.signal_next()
 
     @combat_group.command(name="hp", description="Adjust HP (+heal, -damage)")
     @dm_only()
@@ -214,11 +687,14 @@ class CombatCog(commands.Cog, name="Combat"):
             await interaction.response.send_message("No active combat.", ephemeral=True)
             return
         row = db.fetchone(
-            "SELECT id,hp,max_hp,name FROM combatants WHERE encounter_id=? AND name LIKE ? AND is_active=1",
+            "SELECT id,hp,max_hp,name FROM combatants "
+            "WHERE encounter_id=? AND name LIKE ? AND is_active=1",
             (tracker.encounter_id, f"%{name}%"),
         )
         if not row:
-            await interaction.response.send_message(f"No combatant matching '{name}'.", ephemeral=True)
+            await interaction.response.send_message(
+                f"No combatant matching '{name}'.", ephemeral=True
+            )
             return
         new_hp = max(0, min(row["hp"] + delta, row["max_hp"]))
         db.execute("UPDATE combatants SET hp=? WHERE id=?", (new_hp, row["id"]))
@@ -231,45 +707,46 @@ class CombatCog(commands.Cog, name="Combat"):
     @combat_group.command(name="add", description="Add a combatant mid-fight")
     @dm_only()
     async def combat_add(
-        self,
-        interaction: discord.Interaction,
-        name: str,
-        hp: int,
-        ac: int = 10,
-        initiative: int = 0,
-        combatant_type: str = "monster",
+        self, interaction: discord.Interaction,
+        name: str, hp: int, ac: int = 10,
+        initiative: int = 0, combatant_type: str = "monster",
     ):
         tracker = _active.get(interaction.guild.id)
         if not tracker:
             await interaction.response.send_message("No active combat.", ephemeral=True)
             return
         db.execute(
-            "INSERT INTO combatants (encounter_id,name,combatant_type,initiative,hp,max_hp,ac,conditions,notes) VALUES (?,?,?,?,?,?,?,?,?)",
-            (tracker.encounter_id, name, combatant_type, initiative, hp, hp, ac, "[]", ""),
+            "INSERT INTO combatants "
+            "(encounter_id,name,combatant_type,initiative,hp,max_hp,ac,"
+            "atk_bonus,damage_dice,conditions,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (tracker.encounter_id, name, combatant_type, initiative, hp, hp, ac,
+             2, "1d6", "[]", ""),
         )
         await self._refresh(tracker)
-        await interaction.response.send_message(f"Added **{name}** (HP {hp}, AC {ac}).", ephemeral=True)
+        await interaction.response.send_message(
+            f"Added **{name}** (HP {hp}, AC {ac}).", ephemeral=True
+        )
 
     @combat_group.command(name="condition", description="Apply or remove a condition")
     @app_commands.choices(condition=_CONDITION_CHOICES)
     @dm_only()
     async def combat_condition(
-        self,
-        interaction: discord.Interaction,
-        name: str,
-        condition: str,
-        remove: bool = False,
+        self, interaction: discord.Interaction,
+        name: str, condition: str, remove: bool = False,
     ):
         tracker = _active.get(interaction.guild.id)
         if not tracker:
             await interaction.response.send_message("No active combat.", ephemeral=True)
             return
         row = db.fetchone(
-            "SELECT id,name,conditions FROM combatants WHERE encounter_id=? AND name LIKE ? AND is_active=1",
+            "SELECT id,name,conditions FROM combatants "
+            "WHERE encounter_id=? AND name LIKE ? AND is_active=1",
             (tracker.encounter_id, f"%{name}%"),
         )
         if not row:
-            await interaction.response.send_message(f"No combatant matching '{name}'.", ephemeral=True)
+            await interaction.response.send_message(
+                f"No combatant matching '{name}'.", ephemeral=True
+            )
             return
         conditions = json.loads(row.get("conditions") or "[]")
         if remove:
@@ -279,9 +756,12 @@ class CombatCog(commands.Cog, name="Combat"):
             if condition not in conditions:
                 conditions.append(condition)
             verb = "Applied"
-        db.execute("UPDATE combatants SET conditions=? WHERE id=?", (json.dumps(conditions), row["id"]))
+        db.execute("UPDATE combatants SET conditions=? WHERE id=?",
+                   (json.dumps(conditions), row["id"]))
         await self._refresh(tracker)
-        await interaction.response.send_message(f"{verb} **{condition}** on {row['name']}.", ephemeral=True)
+        await interaction.response.send_message(
+            f"{verb} **{condition}** on {row['name']}.", ephemeral=True
+        )
 
     @combat_group.command(name="notes", description="Set notes for a combatant")
     @dm_only()
@@ -291,15 +771,20 @@ class CombatCog(commands.Cog, name="Combat"):
             await interaction.response.send_message("No active combat.", ephemeral=True)
             return
         row = db.fetchone(
-            "SELECT id,name FROM combatants WHERE encounter_id=? AND name LIKE ? AND is_active=1",
+            "SELECT id,name FROM combatants "
+            "WHERE encounter_id=? AND name LIKE ? AND is_active=1",
             (tracker.encounter_id, f"%{name}%"),
         )
         if not row:
-            await interaction.response.send_message(f"No combatant matching '{name}'.", ephemeral=True)
+            await interaction.response.send_message(
+                f"No combatant matching '{name}'.", ephemeral=True
+            )
             return
         db.execute("UPDATE combatants SET notes=? WHERE id=?", (notes, row["id"]))
         await self._refresh(tracker)
-        await interaction.response.send_message(f"Notes updated for **{row['name']}**.", ephemeral=True)
+        await interaction.response.send_message(
+            f"Notes updated for **{row['name']}**.", ephemeral=True
+        )
 
     @combat_group.command(name="remove", description="Remove a combatant (defeated)")
     @dm_only()
@@ -309,11 +794,14 @@ class CombatCog(commands.Cog, name="Combat"):
             await interaction.response.send_message("No active combat.", ephemeral=True)
             return
         row = db.fetchone(
-            "SELECT id,name FROM combatants WHERE encounter_id=? AND name LIKE ? AND is_active=1",
+            "SELECT id,name FROM combatants "
+            "WHERE encounter_id=? AND name LIKE ? AND is_active=1",
             (tracker.encounter_id, f"%{name}%"),
         )
         if not row:
-            await interaction.response.send_message(f"No combatant matching '{name}'.", ephemeral=True)
+            await interaction.response.send_message(
+                f"No combatant matching '{name}'.", ephemeral=True
+            )
             return
         db.execute("UPDATE combatants SET is_active=0, hp=0 WHERE id=?", (row["id"],))
         await self._refresh(tracker)
@@ -331,16 +819,17 @@ class CombatCog(commands.Cog, name="Combat"):
     @combat_group.command(name="end", description="End the current combat")
     @dm_only()
     async def combat_end(self, interaction: discord.Interaction):
-        gid = interaction.guild.id
+        gid     = interaction.guild.id
         tracker = _active.get(gid)
         if not tracker:
             await interaction.response.send_message("No active combat.", ephemeral=True)
             return
-        enc = tracker.encounter()
+        tracker.stop()
+        enc    = tracker.encounter()
         fallen = tracker.fallen()
         db.execute("UPDATE encounters SET status='completed' WHERE id=?", (tracker.encounter_id,))
-        final = tracker.build_embed()
-        final.title = f"✅  {enc['name']} — Completed"
+        final       = tracker.build_embed()
+        final.title  = f"✅  {enc['name']} — Completed"
         final.colour = 0x44AA44
         summary_parts = [f"**{enc['round']}** round{'s' if enc['round'] != 1 else ''}"]
         if fallen:
@@ -348,6 +837,7 @@ class CombatCog(commands.Cog, name="Combat"):
             summary_parts.append(f"Fallen: {names}")
         final.add_field(name="Battle Summary", value=" · ".join(summary_parts), inline=False)
         await tracker.player_message.edit(embed=final)
+        await tracker._cleanup_action_msg()
         if tracker.vc:
             await _speak(tracker.vc, "Combat over.")
             await asyncio.sleep(3)
@@ -366,11 +856,14 @@ class CombatCog(commands.Cog, name="Combat"):
             await interaction.response.send_message("No active combat.", ephemeral=True)
             return
         row = db.fetchone(
-            "SELECT id,name FROM combatants WHERE encounter_id=? AND name LIKE ? AND is_active=1",
+            "SELECT id,name FROM combatants "
+            "WHERE encounter_id=? AND name LIKE ? AND is_active=1",
             (tracker.encounter_id, f"%{name}%"),
         )
         if not row:
-            await interaction.response.send_message(f"No combatant matching '{name}'.", ephemeral=True)
+            await interaction.response.send_message(
+                f"No combatant matching '{name}'.", ephemeral=True
+            )
             return
         db.execute("UPDATE combatants SET initiative=? WHERE id=?", (value, row["id"]))
         await self._refresh(tracker)
@@ -391,11 +884,20 @@ class CombatCog(commands.Cog, name="Combat"):
             (cid, title, notes, "session"),
         )
         player_channel_id = config.get_key(interaction.guild.id, "player_channel_id")
-        target = interaction.guild.get_channel(int(player_channel_id)) if player_channel_id else interaction.channel
-        embed = discord.Embed(title=f"Session Recap — {title}", description=notes[:4096], colour=0x7060A0)
+        target = (
+            interaction.guild.get_channel(int(player_channel_id))
+            if player_channel_id else interaction.channel
+        )
+        embed = discord.Embed(
+            title=f"Session Recap — {title}",
+            description=notes[:4096],
+            colour=0x7060A0,
+        )
         embed.set_footer(text=f"Session log ID {lore_id}")
         await target.send(embed=embed)
-        await interaction.response.send_message(f"Recap posted to {target.mention}.", ephemeral=True)
+        await interaction.response.send_message(
+            f"Recap posted to {target.mention}.", ephemeral=True
+        )
 
     @session_group.command(name="history", description="Show recent session recaps")
     async def session_history(self, interaction: discord.Interaction, limit: int = 5):
@@ -404,7 +906,8 @@ class CombatCog(commands.Cog, name="Combat"):
             await interaction.response.send_message("No active campaign.", ephemeral=True)
             return
         rows = db.fetchall(
-            "SELECT id,title,content,created_at FROM lore WHERE campaign_id=? AND lore_type='session' ORDER BY id DESC LIMIT ?",
+            "SELECT id,title,content,created_at FROM lore "
+            "WHERE campaign_id=? AND lore_type='session' ORDER BY id DESC LIMIT ?",
             (cid, min(limit, 10)),
         )
         if not rows:

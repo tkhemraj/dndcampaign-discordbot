@@ -79,8 +79,10 @@ def generate(
             "hp":             hp_roll,
             "max_hp":         hp_roll,
             "ac":             monster["ac"],
+            "atk_bonus":      monster["atk"],
+            "damage_dice":    monster["dmg"],
             "conditions":     "[]",
-            "notes":          f"CR {monster['cr']} · ATK +{monster['atk']} · DMG {monster['dmg']}",
+            "notes":          f"CR {monster['cr']}",
         })
         spent += CR_TO_XP.get(monster["cr"], 0)
 

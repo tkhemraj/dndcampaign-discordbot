@@ -11,6 +11,9 @@ _DEFAULT: dict = {
     "player_channel_id": None,
     "voice_channel_id": None,
     "active_campaign_id": None,
+    "dm_mode": "manual",       # "manual" | "auto"
+    "player_mode": "managed",  # "managed" | "open"
+    "auto_turn_timeout": 5,    # minutes before auto-skip; 0 = disabled
 }
 
 

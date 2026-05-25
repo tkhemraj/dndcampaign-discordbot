@@ -78,6 +78,8 @@ CREATE TABLE IF NOT EXISTS combatants (
     hp             INTEGER DEFAULT 0,
     max_hp         INTEGER DEFAULT 0,
     ac             INTEGER DEFAULT 10,
+    atk_bonus      INTEGER DEFAULT 0,
+    damage_dice    TEXT DEFAULT '1d6',
     conditions     TEXT DEFAULT '[]',
     notes          TEXT DEFAULT '',
     is_active      INTEGER DEFAULT 1
@@ -142,6 +144,16 @@ def init() -> None:
         return
     with sqlite3.connect(_DB_PATH) as conn:
         conn.executescript(SCHEMA)
+        # Migrations: add autopilot columns if missing (idempotent)
+        for col, typedef in [
+            ("atk_bonus",   "INTEGER DEFAULT 0"),
+            ("damage_dice", "TEXT    DEFAULT '1d6'"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE combatants ADD COLUMN {col} {typedef}")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass  # column already exists
 
 
 def _connect() -> sqlite3.Connection:

@@ -45,6 +45,54 @@ class SetupCog(commands.Cog, name="Setup"):
             f"Voice channel set to **{channel.name}**. The bot will join it during combat and announce turns.", ephemeral=True
         )
 
+    @setup_group.command(name="dm_mode", description="Set DM mode: auto (bot runs combat) or manual (DM controls)")
+    @app_commands.choices(mode=[
+        app_commands.Choice(name="auto   — bot resolves monster turns, prompts players", value="auto"),
+        app_commands.Choice(name="manual — DM controls all actions (default)",           value="manual"),
+    ])
+    @dm_only()
+    async def setup_dm_mode(self, interaction: discord.Interaction, mode: str):
+        config.set_key(interaction.guild.id, "dm_mode", mode)
+        desc = (
+            "Bot will auto-resolve monster attacks and prompt players for their turns."
+            if mode == "auto" else
+            "DM manually calls /combat next for every turn (default behaviour)."
+        )
+        await interaction.response.send_message(
+            f"DM mode → **{mode}**. {desc}", ephemeral=True
+        )
+
+    @setup_group.command(name="player_mode", description="Set player mode: open (players interact) or managed (DM controls)")
+    @app_commands.choices(mode=[
+        app_commands.Choice(name="open    — players use buttons and /combat done on their turn", value="open"),
+        app_commands.Choice(name="managed — DM controls all actions including players (default)", value="managed"),
+    ])
+    @dm_only()
+    async def setup_player_mode(self, interaction: discord.Interaction, mode: str):
+        config.set_key(interaction.guild.id, "player_mode", mode)
+        desc = (
+            "Players will see action buttons (Attack / Cast Spell / Dodge / Pass) on their turn."
+            if mode == "open" else
+            "Players are observers; DM manages all character actions."
+        )
+        await interaction.response.send_message(
+            f"Player mode → **{mode}**. {desc}", ephemeral=True
+        )
+
+    @setup_group.command(name="auto_timeout", description="Minutes before auto-advancing a stalled player turn (0 = disabled)")
+    @dm_only()
+    async def setup_auto_timeout(self, interaction: discord.Interaction, minutes: int):
+        if minutes < 0:
+            await interaction.response.send_message("Minutes must be ≥ 0.", ephemeral=True)
+            return
+        config.set_key(interaction.guild.id, "auto_turn_timeout", minutes)
+        if minutes == 0:
+            await interaction.response.send_message("Auto-timeout disabled — player turns wait indefinitely.", ephemeral=True)
+        else:
+            await interaction.response.send_message(
+                f"Auto-timeout set to **{minutes} minute{'s' if minutes != 1 else ''}**.", ephemeral=True
+            )
+
     @setup_group.command(name="status", description="Show current bot configuration")
     async def setup_status(self, interaction: discord.Interaction):
         cfg = config.get(interaction.guild.id)
@@ -73,6 +121,14 @@ class SetupCog(commands.Cog, name="Setup"):
         embed.add_field(name="DM Channel",     value=_chan(cfg["dm_channel_id"]),       inline=True)
         embed.add_field(name="Player Channel", value=_chan(cfg["player_channel_id"]),   inline=True)
         embed.add_field(name="Voice Channel",  value=_vc(cfg.get("voice_channel_id")), inline=True)
+
+        dm_mode     = cfg.get("dm_mode", "manual")
+        player_mode = cfg.get("player_mode", "managed")
+        timeout_min = cfg.get("auto_turn_timeout", 5)
+        timeout_str = f"{timeout_min}m" if timeout_min else "off"
+        embed.add_field(name="DM Mode",     value=dm_mode,                          inline=True)
+        embed.add_field(name="Player Mode", value=player_mode,                      inline=True)
+        embed.add_field(name="Turn Timeout",value=timeout_str,                      inline=True)
 
         cid = cfg["active_campaign_id"]
         if cid:
