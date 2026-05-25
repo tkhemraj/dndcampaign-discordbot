@@ -122,6 +122,17 @@ class GenerateCog(commands.Cog, name="Generate"):
         embed.set_footer(text=f"Saved as NPC ID {row_id}")
         await interaction.followup.send(embed=embed, ephemeral=True)
 
+    @npc_group.command(name="view", description="View a saved NPC's full stat card")
+    @dm_only()
+    async def npc_view(self, interaction: discord.Interaction, npc_id: int):
+        row = db.fetchone("SELECT * FROM npcs WHERE id=?", (npc_id,))
+        if not row:
+            await interaction.response.send_message(f"No NPC with ID {npc_id}.", ephemeral=True)
+            return
+        embed = _npc_embed(row)
+        embed.set_footer(text=f"NPC ID {npc_id} · Status: {row.get('status','alive').title()}")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
     @npc_group.command(name="list", description="List NPCs in the active campaign")
     @app_commands.choices(status=_STATUS_CHOICES)
     async def npc_list(self, interaction: discord.Interaction, status: str = "alive"):
