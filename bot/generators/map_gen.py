@@ -63,9 +63,9 @@ def generate(map_type: str, subtype: str | None, width: int | None = None, heigh
     # Smaller grids → bigger tiles → crisper output
     if width is None or height is None:
         if map_type in ("dungeon", "interior"):
-            width = width or 44; height = height or 32
+            width = width or 40; height = height or 28
         else:  # outdoor, wildemount
-            width = width or 56; height = height or 38
+            width = width or 44; height = height or 32
     rng = random.Random(seed)
     if map_type == "dungeon":
         return _dungeon(subtype or "generic", width, height, rng)
