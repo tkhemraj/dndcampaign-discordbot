@@ -37,6 +37,14 @@ class SetupCog(commands.Cog, name="Setup"):
             f"Player channel set to {channel.mention}.", ephemeral=True
         )
 
+    @setup_group.command(name="voice_channel", description="Set the voice channel for combat turn announcements (TTS)")
+    @dm_only()
+    async def setup_voice_channel(self, interaction: discord.Interaction, channel: discord.VoiceChannel):
+        config.set_key(interaction.guild.id, "voice_channel_id", channel.id)
+        await interaction.response.send_message(
+            f"Voice channel set to **{channel.name}**. The bot will join it during combat and announce turns.", ephemeral=True
+        )
+
     @setup_group.command(name="status", description="Show current bot configuration")
     async def setup_status(self, interaction: discord.Interaction):
         cfg = config.get(interaction.guild.id)
@@ -54,10 +62,17 @@ class SetupCog(commands.Cog, name="Setup"):
             c = guild.get_channel(int(cid))
             return c.mention if c else f"_unknown ({cid})_"
 
+        def _vc(cid):
+            if not cid:
+                return "_not set_"
+            c = guild.get_channel(int(cid))
+            return f"🔊 {c.name}" if c else f"_unknown ({cid})_"
+
         embed = discord.Embed(title="Bot Configuration", colour=0xD4A040)
         embed.add_field(name="DM Role",        value=_role(cfg["dm_role_id"]),         inline=True)
         embed.add_field(name="DM Channel",     value=_chan(cfg["dm_channel_id"]),       inline=True)
         embed.add_field(name="Player Channel", value=_chan(cfg["player_channel_id"]),   inline=True)
+        embed.add_field(name="Voice Channel",  value=_vc(cfg.get("voice_channel_id")), inline=True)
 
         cid = cfg["active_campaign_id"]
         if cid:

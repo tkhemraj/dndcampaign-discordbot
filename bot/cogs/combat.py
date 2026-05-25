@@ -1,6 +1,9 @@
 """Combat tracker — live embed in player channel, DM controls."""
 from __future__ import annotations
+import asyncio
 import json
+import os
+import tempfile
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -10,11 +13,39 @@ from bot.guard import dm_only
 _active: dict[int, "_Tracker"] = {}
 
 
+def _tts_to_file(text: str) -> str:
+    """Generate TTS MP3 via gTTS and return a temp file path. Runs in thread executor."""
+    from gtts import gTTS
+    tts = gTTS(text=text, lang="en", slow=False)
+    tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+    tts.save(tmp.name)
+    return tmp.name
+
+
+async def _speak(vc: discord.VoiceClient, text: str) -> None:
+    """Play a TTS announcement on an already-connected VoiceClient."""
+    if vc is None or not vc.is_connected():
+        return
+    try:
+        path = await asyncio.get_event_loop().run_in_executor(None, _tts_to_file, text)
+    except Exception:
+        return
+    if vc.is_playing():
+        vc.stop()
+    def _after(_err):
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+    vc.play(discord.FFmpegPCMAudio(path), after=_after)
+
+
 class _Tracker:
     def __init__(self, encounter_id: int, guild_id: int, player_message: discord.Message):
         self.encounter_id = encounter_id
         self.guild_id = guild_id
         self.player_message = player_message
+        self.vc: discord.VoiceClient | None = None
 
     def combatants(self) -> list[dict]:
         return db.fetchall(
@@ -90,6 +121,25 @@ class CombatCog(commands.Cog, name="Combat"):
         tracker = _Tracker(encounter_id, gid, msg)
         _active[gid] = tracker
         await self._refresh(tracker)
+
+        vc_id = config.get_key(gid, "voice_channel_id")
+        if vc_id:
+            vc_channel = interaction.guild.get_channel(int(vc_id))
+            if vc_channel:
+                try:
+                    existing = interaction.guild.voice_client
+                    if existing:
+                        await existing.move_to(vc_channel)
+                        tracker.vc = existing
+                    else:
+                        tracker.vc = await vc_channel.connect()
+                    cur = tracker.current()
+                    name = cur["name"] if cur else "unknown"
+                    enc_name = enc["name"]
+                    await _speak(tracker.vc, f"Combat has begun. {enc_name}. {name} goes first.")
+                except Exception:
+                    pass
+
         await interaction.followup.send(f"Combat started in {target.mention}.", ephemeral=True)
 
     @combat_group.command(name="next", description="Advance to the next turn")
@@ -111,6 +161,9 @@ class CombatCog(commands.Cog, name="Combat"):
         await self._refresh(tracker)
         cur = tracker.current()
         await interaction.response.send_message(f"→ **{cur['name'] if cur else '?'}**", ephemeral=True)
+        if cur and tracker.vc:
+            enc = tracker.encounter()
+            await _speak(tracker.vc, f"{cur['name']}, round {enc['round']}.")
 
     @combat_group.command(name="hp", description="Adjust HP (+heal, -damage)")
     @dm_only()
@@ -247,6 +300,13 @@ class CombatCog(commands.Cog, name="Combat"):
         final.title = f"✅  {enc['name']} — Completed"
         final.colour = 0x44AA44
         await tracker.player_message.edit(embed=final)
+        if tracker.vc:
+            await _speak(tracker.vc, "Combat over.")
+            await asyncio.sleep(3)
+            try:
+                await tracker.vc.disconnect()
+            except Exception:
+                pass
         _active.pop(gid, None)
         await interaction.response.send_message("Combat ended.", ephemeral=True)
 

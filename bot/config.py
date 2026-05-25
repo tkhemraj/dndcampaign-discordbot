@@ -9,6 +9,7 @@ _DEFAULT: dict = {
     "dm_role_id": None,
     "dm_channel_id": None,
     "player_channel_id": None,
+    "voice_channel_id": None,
     "active_campaign_id": None,
 }
 
