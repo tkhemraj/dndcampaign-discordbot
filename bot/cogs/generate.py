@@ -5,7 +5,7 @@ from discord import app_commands
 from discord.ext import commands
 from bot import config, db
 from bot.guard import dm_only
-from bot.generators import npc_gen, quest_gen, encounter_gen
+from bot.generators import npc_gen, quest_gen, encounter_gen, npc_dialogue
 
 _REGION_CHOICES = [
     app_commands.Choice(name="Western Wynandir",  value="Western Wynandir"),
@@ -132,6 +132,29 @@ class GenerateCog(commands.Cog, name="Generate"):
         embed = _npc_embed(row)
         embed.set_footer(text=f"NPC ID {npc_id} · Status: {row.get('status','alive').title()}")
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @npc_group.command(name="speak", description="Ask an NPC a question and get an in-character reply (AI)")
+    @dm_only()
+    async def npc_speak(self, interaction: discord.Interaction, npc_id: int, question: str):
+        await interaction.response.defer(ephemeral=True)
+        npc = db.fetchone("SELECT * FROM npcs WHERE id=?", (npc_id,))
+        if not npc:
+            await interaction.followup.send(f"No NPC with ID {npc_id}.", ephemeral=True)
+            return
+        try:
+            reply = await interaction.client.loop.run_in_executor(
+                None, npc_dialogue.speak, npc, question
+            )
+        except RuntimeError as e:
+            await interaction.followup.send(f"AI dialogue unavailable: {e}", ephemeral=True)
+            return
+        embed = discord.Embed(
+            description=f'*"{reply}"*',
+            colour=0xD4A040,
+        )
+        embed.set_author(name=f"{npc['name']} says…")
+        embed.set_footer(text=f"{npc['race']} {npc['npc_class']} · {npc.get('faction') or 'No faction'} · NPC ID {npc_id}")
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @npc_group.command(name="list", description="List NPCs in the active campaign")
     @app_commands.choices(status=_STATUS_CHOICES)
