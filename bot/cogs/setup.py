@@ -93,6 +93,56 @@ class SetupCog(commands.Cog, name="Setup"):
                 f"Auto-timeout set to **{minutes} minute{'s' if minutes != 1 else ''}**.", ephemeral=True
             )
 
+    @setup_group.command(name="event_mode", description="Set world event mode: auto (bot fires events) or manual (DM triggers)")
+    @app_commands.choices(mode=[
+        app_commands.Choice(name="auto   — bot posts ambient world events on a timer", value="auto"),
+        app_commands.Choice(name="manual — DM triggers events on demand with /event fire (default)", value="manual"),
+    ])
+    @dm_only()
+    async def setup_event_mode(self, interaction: discord.Interaction, mode: str):
+        from bot.cogs.events import _start_task, _stop_task
+        gid = interaction.guild.id
+        config.set_key(gid, "event_mode", mode)
+        if mode == "auto":
+            _start_task(gid, interaction.client)
+            interval = config.get_key(gid, "event_interval") or 20
+            await interaction.response.send_message(
+                f"World event mode → **auto** — bot will post ambient events every **{interval} min**.\n"
+                f"Use `/setup event_interval` to change the cadence. Use `/event fire` to trigger one now.",
+                ephemeral=True,
+            )
+        else:
+            _stop_task(gid)
+            await interaction.response.send_message(
+                "World event mode → **manual** — use `/event fire` to trigger events on demand.",
+                ephemeral=True,
+            )
+
+    @setup_group.command(name="event_interval", description="Minutes between auto world events (default 20)")
+    @dm_only()
+    async def setup_event_interval(self, interaction: discord.Interaction, minutes: int):
+        if minutes < 1:
+            await interaction.response.send_message("Interval must be at least 1 minute.", ephemeral=True)
+            return
+        config.set_key(interaction.guild.id, "event_interval", minutes)
+        await interaction.response.send_message(
+            f"Event interval set to **{minutes} minute{'s' if minutes != 1 else ''}**.", ephemeral=True
+        )
+
+    @setup_group.command(name="event_dm_only", description="Where auto events are posted: player channel or DM channel")
+    @app_commands.choices(target=[
+        app_commands.Choice(name="player  — post directly to player channel (default)", value="player"),
+        app_commands.Choice(name="dm      — post to DM channel so DM decides what to share", value="dm"),
+    ])
+    @dm_only()
+    async def setup_event_dm_only(self, interaction: discord.Interaction, target: str):
+        dm_only = (target == "dm")
+        config.set_key(interaction.guild.id, "event_dm_only", dm_only)
+        dest = "DM channel (DM curates before sharing)" if dm_only else "player channel (posted publicly)"
+        await interaction.response.send_message(
+            f"World events will be posted to the **{dest}**.", ephemeral=True
+        )
+
     @setup_group.command(name="status", description="Show current bot configuration")
     async def setup_status(self, interaction: discord.Interaction):
         cfg = config.get(interaction.guild.id)
@@ -122,13 +172,18 @@ class SetupCog(commands.Cog, name="Setup"):
         embed.add_field(name="Player Channel", value=_chan(cfg["player_channel_id"]),   inline=True)
         embed.add_field(name="Voice Channel",  value=_vc(cfg.get("voice_channel_id")), inline=True)
 
-        dm_mode     = cfg.get("dm_mode", "manual")
-        player_mode = cfg.get("player_mode", "managed")
-        timeout_min = cfg.get("auto_turn_timeout", 5)
-        timeout_str = f"{timeout_min}m" if timeout_min else "off"
+        dm_mode      = cfg.get("dm_mode", "manual")
+        player_mode  = cfg.get("player_mode", "managed")
+        timeout_min  = cfg.get("auto_turn_timeout", 5)
+        timeout_str  = f"{timeout_min}m" if timeout_min else "off"
+        event_mode   = cfg.get("event_mode", "manual")
+        event_int    = cfg.get("event_interval", 20)
+        event_target = "dm ch" if cfg.get("event_dm_only") else "player ch"
         embed.add_field(name="DM Mode",     value=dm_mode,                          inline=True)
         embed.add_field(name="Player Mode", value=player_mode,                      inline=True)
         embed.add_field(name="Turn Timeout",value=timeout_str,                      inline=True)
+        embed.add_field(name="Event Mode",  value=event_mode,                       inline=True)
+        embed.add_field(name="Event Every", value=f"{event_int}m → {event_target}", inline=True)
 
         cid = cfg["active_campaign_id"]
         if cid:

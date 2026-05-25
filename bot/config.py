@@ -14,6 +14,9 @@ _DEFAULT: dict = {
     "dm_mode": "manual",       # "manual" | "auto"
     "player_mode": "managed",  # "managed" | "open"
     "auto_turn_timeout": 5,    # minutes before auto-skip; 0 = disabled
+    "event_mode": "manual",    # "manual" | "auto"
+    "event_interval": 20,      # minutes between auto events
+    "event_dm_only": False,    # True = post to dm_channel; False = player_channel
 }
 
 

@@ -40,6 +40,7 @@ Configure a voice channel with `/setup voice_channel` and the bot joins automati
 |---|---|---|
 | **Autopilot combat** | `/setup dm_mode auto` | Bot auto-resolves monster attacks, rolls initiative, advances turns — DM narrates; switch to `manual` for social sessions |
 | **Player action buttons** | `/setup player_mode open` | Players see Attack / Cast Spell / Dodge / Pass buttons on their turn; `/combat done` to end turn |
+| **World events** | `/event fire`, `/event preview` | Ambient atmospheric, faction, rumour, discovery, encounter, and omen events — fire on demand or run on a timer in auto mode |
 | **Live combat tracker** | `/combat start/next/hp/initiative/done/end` | DM controls privately; players see live embed with 🛡️ player icons and battle summary on end |
 | **Player characters** | `/pc register/view/list/hp/update/slots/cast/rest/inspire/retire` | Players register their own PCs; auto-join combat with correct stats; spell slot tracking |
 | **Voice turn announcements** | `/setup voice_channel` | Bot joins VC on combat start, announces each turn via TTS, disconnects on end |
@@ -56,6 +57,7 @@ Configure a voice channel with `/setup voice_channel` and the bot joins automati
 | **Autocomplete everywhere** | all commands | Region, faction, difficulty, condition, status — all dropdown-driven |
 
 **Combat modes:** `dm_mode=auto` (bot runs combat) · `dm_mode=manual` (DM controls) · `player_mode=open` (action buttons) · `player_mode=managed` (DM drives)  
+**Event types:** `weather` · `rumour` · `discovery` · `faction` · `omen` · `encounter`  
 **Map types:** `dungeon` · `outdoor` · `interior` · `wildemount`  
 **Dungeon subtypes:** `generic` · `underdark` · `crypt` · `sewers` · `cerberus_lab` · `bazzoxan`  
 **Dice expressions:** `1d20` · `2d6+3` · `4d6kh3` · `1d20 adv` · `1d20 dis` · `2d8-1`
@@ -139,6 +141,31 @@ Players can also type `/combat done` to end their own turn.
 /setup auto_timeout 5   ← auto-skip stalled player turns after 5 minutes
 /setup auto_timeout 0   ← disable (wait indefinitely)
 ```
+
+### World events
+
+A second autopilot axis — independent of combat mode. The bot generates ambient narrative events and posts them to keep the world feeling alive during social, travel, or exploration sessions.
+
+```
+/setup event_mode auto     ← bot fires events on a timer
+/setup event_mode manual   ← DM triggers events on demand
+/setup event_interval 20   ← every 20 minutes (default)
+/setup event_dm_only dm    ← events go to DM channel first (DM decides what to share)
+/setup event_dm_only player← events post directly to player channel (default)
+```
+
+**Event types** (any can be triggered manually or weighted randomly in auto):
+
+| Type | What it generates |
+|---|---|
+| `weather` | Atmospheric changes — storms, fog, cold snaps, ash fall, aurora |
+| `rumour` | Overheard information from NPCs with source and reliability |
+| `faction` | Nearby faction activity — Assembly mages, Kryn scouts, Myriad drops |
+| `discovery` | Environmental finds — abandoned camps, dead couriers, locked boxes |
+| `omen` | Supernatural portents — crow parliaments, dunamantic ripples, Luxon light |
+| `encounter` | Non-combat NPC moments — lost pilgrims, wounded animals, old soldiers |
+
+Use `/event fire [type] [region]` for on-demand events. Use `/event preview` to see one ephemerally before deciding to share it. Use `/event status` to check current settings and whether the loop is running.
 
 ---
 

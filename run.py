@@ -24,6 +24,7 @@ COGS = [
     "bot.cogs.dice",
     "bot.cogs.loot",
     "bot.cogs.pc",
+    "bot.cogs.events",
 ]
 
 intents = discord.Intents.default()
