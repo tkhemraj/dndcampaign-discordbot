@@ -64,6 +64,14 @@ async def _event_loop(guild_id: int, bot: commands.Bot) -> None:
             except Exception:
                 pass
 
+            # Narrate the event in the voice channel if one is active
+            vc_id = config.get_key(guild_id, "voice_channel_id")
+            if vc_id and guild.voice_client and guild.voice_client.is_connected():
+                from bot.narrator import narrate_event
+                from bot.cogs.combat import _speak
+                line = narrate_event(event)
+                asyncio.create_task(_speak(guild.voice_client, line))
+
     except asyncio.CancelledError:
         pass
 

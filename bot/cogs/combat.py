@@ -47,18 +47,28 @@ def _tts_to_file(text: str) -> str:
 async def _speak(vc: discord.VoiceClient, text: str) -> None:
     if vc is None or not vc.is_connected():
         return
+    # Strip markdown that TTS would read literally
+    clean = text.replace("**", "").replace("*", "").replace("`", "").replace("_", " ")
     try:
-        path = await asyncio.get_event_loop().run_in_executor(None, _tts_to_file, text)
+        path = await asyncio.get_event_loop().run_in_executor(None, _tts_to_file, clean)
     except Exception:
         return
     if vc.is_playing():
         vc.stop()
+    done = asyncio.Event()
     def _after(_err):
         try:
             os.unlink(path)
         except OSError:
             pass
+        done.set()
     vc.play(discord.FFmpegPCMAudio(path), after=_after)
+
+
+async def _narrate(vc: discord.VoiceClient | None, text: str) -> None:
+    """Speak narration text in the voice channel (fire-and-forget)."""
+    if vc and vc.is_connected():
+        asyncio.create_task(_speak(vc, text))
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -402,6 +412,7 @@ class _Tracker:
 
 async def _resolve_monster_attack(tracker: _Tracker, cur: dict, channel) -> None:
     from bot.engine import resolve_attack
+    from bot.narrator import narrate_attack, narrate_ko
     players = [c for c in tracker.combatants() if c["combatant_type"] == "player"]
     if not players:
         return
@@ -409,12 +420,14 @@ async def _resolve_monster_attack(tracker: _Tracker, cur: dict, channel) -> None
     atk_bonus = cur.get("atk_bonus") or 2
     dmg_dice  = cur.get("damage_dice") or "1d6"
     result    = resolve_attack(int(atk_bonus), target["ac"], dmg_dice)
+    ko        = False
 
     if result["hit"]:
         new_hp = max(0, target["hp"] - result["damage"])
         db.execute("UPDATE combatants SET hp=? WHERE id=?", (new_hp, target["id"]))
         if new_hp == 0:
             db.execute("UPDATE combatants SET is_active=0 WHERE id=?", (target["id"],))
+            ko = True
         dmg_str  = "+".join(str(r) for r in result["dmg_rolls"])
         crit_tag = " 💥 **CRITICAL HIT!**" if result["crit"] else ""
         desc   = (
@@ -434,6 +447,19 @@ async def _resolve_monster_attack(tracker: _Tracker, cur: dict, channel) -> None
 
     if channel:
         await channel.send(embed=discord.Embed(description=desc, colour=colour))
+
+    # Narrate the attack result aloud
+    if tracker.vc:
+        line = await asyncio.get_event_loop().run_in_executor(
+            None, narrate_attack, cur["name"], target["name"], result
+        )
+        await _narrate(tracker.vc, line)
+        if ko:
+            await asyncio.sleep(2)
+            ko_line = await asyncio.get_event_loop().run_in_executor(
+                None, narrate_ko, target["name"]
+            )
+            await _narrate(tracker.vc, ko_line)
 
 
 async def _auto_run(tracker: _Tracker, bot: commands.Bot) -> None:
@@ -474,8 +500,14 @@ async def _auto_run(tracker: _Tracker, bot: commands.Bot) -> None:
                 if tracker.vc:
                     nxt = tracker.current()
                     if nxt:
+                        from bot.narrator import narrate_turn
                         enc2 = tracker.encounter()
-                        await _speak(tracker.vc, f"{nxt['name']}, round {enc2['round']}.")
+                        line = await asyncio.get_event_loop().run_in_executor(
+                            None, narrate_turn,
+                            nxt["name"], enc2["round"], nxt.get("combatant_type", "monster")
+                        )
+                        await asyncio.sleep(1.2)
+                        await _narrate(tracker.vc, line)
 
             else:
                 tracker._next_event.clear()
@@ -613,7 +645,11 @@ class CombatCog(commands.Cog, name="Combat"):
                     cur      = tracker.current()
                     name     = cur["name"] if cur else "unknown"
                     enc_name = enc["name"]
-                    await _speak(tracker.vc, f"Combat has begun. {enc_name}. {name} goes first.")
+                    from bot.narrator import narrate_combat_start
+                    line = await asyncio.get_event_loop().run_in_executor(
+                        None, narrate_combat_start, enc_name, name
+                    )
+                    await _narrate(tracker.vc, line)
                 except Exception:
                     pass
 
@@ -641,8 +677,13 @@ class CombatCog(commands.Cog, name="Combat"):
         )
         tracker.signal_next()
         if cur and tracker.vc:
-            enc = tracker.encounter()
-            await _speak(tracker.vc, f"{cur['name']}, round {enc['round']}.")
+            from bot.narrator import narrate_turn
+            enc  = tracker.encounter()
+            line = await asyncio.get_event_loop().run_in_executor(
+                None, narrate_turn,
+                cur["name"], enc["round"], cur.get("combatant_type", "monster")
+            )
+            await _narrate(tracker.vc, line)
 
     @combat_group.command(name="done", description="End your turn (requires player_mode: open)")
     async def combat_done(self, interaction: discord.Interaction):
@@ -839,7 +880,12 @@ class CombatCog(commands.Cog, name="Combat"):
         await tracker.player_message.edit(embed=final)
         await tracker._cleanup_action_msg()
         if tracker.vc:
-            await _speak(tracker.vc, "Combat over.")
+            from bot.narrator import narrate_combat_end
+            fallen_names = [c["name"] for c in fallen]
+            line = await asyncio.get_event_loop().run_in_executor(
+                None, narrate_combat_end, enc["round"], fallen_names
+            )
+            await _narrate(tracker.vc, line)
             await asyncio.sleep(3)
             try:
                 await tracker.vc.disconnect()
