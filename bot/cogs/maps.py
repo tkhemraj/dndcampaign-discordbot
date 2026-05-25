@@ -74,7 +74,7 @@ class MapsCog(commands.Cog, name="Maps"):
         map_data = result.to_dict()
 
         cid = config.get_key(interaction.guild.id, "active_campaign_id")
-        map_name = f"{map_type.title()} — {map_data.get('subtype','generic').title()}"
+        map_name = f"{map_type.title()} — {map_data.get('subtype','generic').replace('_',' ').title()}"
         mid = db.execute(
             "INSERT INTO maps (campaign_id,name,map_data) VALUES (?,?,?)",
             (cid, map_name, json.dumps(map_data)),
@@ -113,12 +113,20 @@ class MapsCog(commands.Cog, name="Maps"):
             map_name = row["name"]
         elif self._last_map:
             map_data = self._last_map
-            map_name = f"{map_data['map_type'].title()} — {map_data.get('subtype','').title()}"
+            map_name = f"{map_data['map_type'].title()} — {map_data.get('subtype','').replace('_',' ').title()}"
         else:
-            await interaction.followup.send(
-                "No map to share. Run `/map generate` first.", ephemeral=True
-            )
-            return
+            cid = config.get_key(interaction.guild.id, "active_campaign_id")
+            recent = db.fetchone(
+                "SELECT map_data, name FROM maps WHERE campaign_id=? ORDER BY id DESC LIMIT 1", (cid,)
+            ) if cid else None
+            if recent:
+                map_data = json.loads(recent["map_data"])
+                map_name = recent["name"]
+            else:
+                await interaction.followup.send(
+                    "No map to share. Run `/map generate` first.", ephemeral=True
+                )
+                return
 
         player_channel_id = config.get_key(interaction.guild.id, "player_channel_id")
         target = interaction.guild.get_channel(int(player_channel_id)) if player_channel_id else interaction.channel

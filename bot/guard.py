@@ -10,17 +10,23 @@ def is_dm(interaction: discord.Interaction) -> bool:
         return False
 
     gid = interaction.guild.id
-    dm_role_id = config.get_key(gid, "dm_role_id")
+    dm_role_id    = config.get_key(gid, "dm_role_id")
     dm_channel_id = config.get_key(gid, "dm_channel_id")
 
-    if dm_role_id:
+    # Nothing configured yet → fall back to server administrator so first-time
+    # setup isn't a chicken-and-egg problem.
+    if not dm_role_id and not dm_channel_id:
         if isinstance(interaction.user, discord.Member):
-            if any(r.id == int(dm_role_id) for r in interaction.user.roles):
-                return True
+            p = interaction.user.guild_permissions
+            return p.administrator or p.manage_guild
+        return False
 
-    if dm_channel_id:
-        if interaction.channel_id == int(dm_channel_id):
+    if dm_role_id and isinstance(interaction.user, discord.Member):
+        if any(r.id == int(dm_role_id) for r in interaction.user.roles):
             return True
+
+    if dm_channel_id and interaction.channel_id == int(dm_channel_id):
+        return True
 
     return False
 

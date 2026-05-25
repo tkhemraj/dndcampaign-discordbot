@@ -80,11 +80,15 @@ class CampaignCog(commands.Cog, name="Campaign"):
         npcs   = db.fetchone("SELECT COUNT(*) as c FROM npcs WHERE campaign_id=?", (cid,))["c"]
         quests = db.fetchone("SELECT COUNT(*) as c FROM quests WHERE campaign_id=? AND status='active'", (cid,))["c"]
         encs   = db.fetchone("SELECT COUNT(*) as c FROM encounters WHERE campaign_id=?", (cid,))["c"]
+        maps   = db.fetchone("SELECT COUNT(*) as c FROM maps WHERE campaign_id=?", (cid,))["c"]
+        loot   = db.fetchone("SELECT COUNT(*) as c FROM loot WHERE campaign_id=?", (cid,))["c"]
         embed  = discord.Embed(title=row["name"], colour=0xD4A040)
         embed.add_field(name="Setting",       value=row["setting"],  inline=True)
         embed.add_field(name="NPCs",          value=str(npcs),       inline=True)
         embed.add_field(name="Active Quests", value=str(quests),     inline=True)
         embed.add_field(name="Encounters",    value=str(encs),       inline=True)
+        embed.add_field(name="Maps",          value=str(maps),       inline=True)
+        embed.add_field(name="Loot Cards",    value=str(loot),       inline=True)
         if row.get("description"):
             embed.add_field(name="Description", value=row["description"][:1024], inline=False)
         embed.set_footer(text=f"ID {cid} · Created {row['created_at'][:10]}")

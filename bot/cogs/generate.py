@@ -64,11 +64,9 @@ def _npc_embed(npc: dict) -> discord.Embed:
     embed.add_field(name="HP",        value=str(npc.get("hp","?")),           inline=True)
     embed.add_field(name="AC",        value=str(npc.get("ac","?")),           inline=True)
     embed.add_field(name="Status",    value=npc.get("status","alive").title(),inline=True)
-    stats = " / ".join(
-        f"{s.upper()}: **{npc.get(f'{s}_score',10)}** ({_mod(npc.get(f'{s}_score',10))})"
-        for s in ["str","dex","con","int","wis","cha"]
-    )
-    embed.add_field(name="Stats", value=stats, inline=False)
+    for s, label in [("str","STR"),("dex","DEX"),("con","CON"),("int","INT"),("wis","WIS"),("cha","CHA")]:
+        score = npc.get(f"{s}_score", 10)
+        embed.add_field(name=label, value=f"**{score}**\n({_mod(score)})", inline=True)
     if npc.get("personality"):
         embed.add_field(name="Personality", value=npc["personality"], inline=False)
     if npc.get("ideal"):
@@ -276,6 +274,19 @@ class GenerateCog(commands.Cog, name="Generate"):
         embed.set_footer(text=f"Library NPC ({tier_label}) · Saved as ID {row_id} · Use /npc speak {row_id}")
         await interaction.followup.send(embed=embed, ephemeral=True)
 
+    @npc_group.command(name="kill", description="Mark an NPC as dead")
+    @dm_only()
+    async def npc_kill(self, interaction: discord.Interaction, npc_id: int):
+        row = db.fetchone("SELECT id,name,status FROM npcs WHERE id=?", (npc_id,))
+        if not row:
+            await interaction.response.send_message(f"No NPC with ID {npc_id}.", ephemeral=True)
+            return
+        if row["status"] == "dead":
+            await interaction.response.send_message(f"**{row['name']}** is already dead.", ephemeral=True)
+            return
+        db.execute("UPDATE npcs SET status='dead' WHERE id=?", (npc_id,))
+        await interaction.response.send_message(f"**{row['name']}** marked as dead.", ephemeral=True)
+
     # ── Quest ─────────────────────────────────────────────────────────────────
 
     quest_group = app_commands.Group(name="quest", description="Quest tools")
@@ -314,14 +325,39 @@ class GenerateCog(commands.Cog, name="Generate"):
         player_channel_id = config.get_key(interaction.guild.id, "player_channel_id")
         target = interaction.guild.get_channel(int(player_channel_id)) if player_channel_id else interaction.channel
         await interaction.response.defer(ephemeral=True)
-        await target.send(embed=discord.Embed(
-            title="Quest Board",
+        colours = {"easy": 0x44AA44, "medium": 0xD4A040, "hard": 0xDD6622, "deadly": 0xCC2222}
+        board = discord.Embed(
+            title="📋 Quest Board",
             description=f"**{len(rows)}** active quest{'s' if len(rows)!=1 else ''}",
             colour=0xD4A040,
-        ))
+        )
         for quest in rows[:10]:
-            await target.send(embed=_quest_embed(quest))
+            diff  = quest.get("difficulty","medium")
+            region = quest.get("region") or ""
+            reward = quest.get("reward") or ""
+            meta = " · ".join(filter(None, [diff.title(), region, f"Reward: {reward}" if reward else ""]))
+            board.add_field(
+                name=quest["title"],
+                value=f"{quest.get('description','')[:200]}\n*{meta}*" if meta else quest.get("description","")[:200],
+                inline=False,
+            )
+        if len(rows) > 10:
+            board.set_footer(text=f"Showing 10 of {len(rows)} quests")
+        await target.send(embed=board)
         await interaction.followup.send(f"Quest board posted to {target.mention}.", ephemeral=True)
+
+    @quest_group.command(name="complete", description="Mark a quest as completed")
+    @dm_only()
+    async def quest_complete(self, interaction: discord.Interaction, quest_id: int):
+        row = db.fetchone("SELECT id,title,status FROM quests WHERE id=?", (quest_id,))
+        if not row:
+            await interaction.response.send_message(f"No quest with ID {quest_id}.", ephemeral=True)
+            return
+        if row["status"] == "completed":
+            await interaction.response.send_message(f"Quest **{row['title']}** is already completed.", ephemeral=True)
+            return
+        db.execute("UPDATE quests SET status='completed' WHERE id=?", (quest_id,))
+        await interaction.response.send_message(f"Quest **{row['title']}** marked as completed.", ephemeral=True)
 
     # ── Encounter ─────────────────────────────────────────────────────────────
 
@@ -367,6 +403,30 @@ class GenerateCog(commands.Cog, name="Generate"):
             embed.add_field(name="Roster", value=roster, inline=False)
         embed.set_footer(text=f"Encounter ID {eid} · Use /combat start {eid} to begin")
         await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+    @encounter_group.command(name="list", description="List saved encounters for this campaign")
+    @dm_only()
+    async def encounter_list(self, interaction: discord.Interaction):
+        cid = config.get_key(interaction.guild.id, "active_campaign_id")
+        if not cid:
+            await interaction.response.send_message("No active campaign.", ephemeral=True)
+            return
+        rows = db.fetchall(
+            "SELECT id,name,status,created_at FROM encounters WHERE campaign_id=? ORDER BY id DESC LIMIT 15",
+            (cid,),
+        )
+        if not rows:
+            await interaction.response.send_message("No encounters yet.", ephemeral=True)
+            return
+        embed = discord.Embed(title="Encounters", colour=0xCC2222)
+        for r in rows:
+            embed.add_field(
+                name=f"[{r['id']}] {r['name']}",
+                value=f"{r['status'].title()} · {r['created_at'][:10]}",
+                inline=False,
+            )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

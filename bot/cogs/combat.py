@@ -61,6 +61,12 @@ class _Tracker:
             (self.encounter_id,),
         )
 
+    def fallen(self) -> list[dict]:
+        return db.fetchall(
+            "SELECT * FROM combatants WHERE encounter_id=? AND is_active=0 ORDER BY initiative DESC",
+            (self.encounter_id,),
+        )
+
     def encounter(self) -> dict:
         return db.fetchone("SELECT * FROM encounters WHERE id=?", (self.encounter_id,))
 
@@ -91,6 +97,8 @@ class _Tracker:
             lines.append(f"{arrow}{name} — HP {hp}/{max_hp} `{bar}` AC {c['ac']}{cond_str}")
             if c.get("notes"):
                 lines.append(f"      *{c['notes']}*")
+        for c in self.fallen():
+            lines.append(f"   ~~{c['name']}~~ 💀")
 
         embed.add_field(name="Initiative Order", value="\n".join(lines) or "_No combatants_", inline=False)
         if cur:
@@ -304,10 +312,16 @@ class CombatCog(commands.Cog, name="Combat"):
             await interaction.response.send_message("No active combat.", ephemeral=True)
             return
         enc = tracker.encounter()
+        fallen = tracker.fallen()
         db.execute("UPDATE encounters SET status='completed' WHERE id=?", (tracker.encounter_id,))
         final = tracker.build_embed()
         final.title = f"✅  {enc['name']} — Completed"
         final.colour = 0x44AA44
+        summary_parts = [f"**{enc['round']}** round{'s' if enc['round'] != 1 else ''}"]
+        if fallen:
+            names = ", ".join(c["name"] for c in fallen)
+            summary_parts.append(f"Fallen: {names}")
+        final.add_field(name="Battle Summary", value=" · ".join(summary_parts), inline=False)
         await tracker.player_message.edit(embed=final)
         if tracker.vc:
             await _speak(tracker.vc, "Combat over.")
@@ -318,6 +332,26 @@ class CombatCog(commands.Cog, name="Combat"):
                 pass
         _active.pop(gid, None)
         await interaction.response.send_message("Combat ended.", ephemeral=True)
+
+    @combat_group.command(name="initiative", description="Override a combatant's initiative score")
+    @dm_only()
+    async def combat_initiative(self, interaction: discord.Interaction, name: str, value: int):
+        tracker = _active.get(interaction.guild.id)
+        if not tracker:
+            await interaction.response.send_message("No active combat.", ephemeral=True)
+            return
+        row = db.fetchone(
+            "SELECT id,name FROM combatants WHERE encounter_id=? AND name LIKE ? AND is_active=1",
+            (tracker.encounter_id, f"%{name}%"),
+        )
+        if not row:
+            await interaction.response.send_message(f"No combatant matching '{name}'.", ephemeral=True)
+            return
+        db.execute("UPDATE combatants SET initiative=? WHERE id=?", (value, row["id"]))
+        await self._refresh(tracker)
+        await interaction.response.send_message(
+            f"**{row['name']}** initiative set to {value}.", ephemeral=True
+        )
 
     # ── Session recaps ────────────────────────────────────────────────────────
 
