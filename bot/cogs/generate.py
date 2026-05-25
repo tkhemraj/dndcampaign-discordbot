@@ -179,7 +179,7 @@ class GenerateCog(commands.Cog, name="Generate"):
     async def npc_list(self, interaction: discord.Interaction, status: str = "alive"):
         cid = config.get_key(interaction.guild.id, "active_campaign_id")
         if not cid:
-            await interaction.response.send_message("No active campaign.", ephemeral=True)
+            await interaction.response.send_message("No active campaign. Start one with `/campaign new [name]`, then `/campaign select` to activate it.", ephemeral=True)
             return
         rows = db.fetchall(
             "SELECT id,name,race,npc_class,level,faction FROM npcs WHERE campaign_id=? AND status=? ORDER BY name",
@@ -313,7 +313,7 @@ class GenerateCog(commands.Cog, name="Generate"):
     async def quest_board(self, interaction: discord.Interaction):
         cid = config.get_key(interaction.guild.id, "active_campaign_id")
         if not cid:
-            await interaction.response.send_message("No active campaign.", ephemeral=True)
+            await interaction.response.send_message("No active campaign. Start one with `/campaign new [name]`, then `/campaign select` to activate it.", ephemeral=True)
             return
         rows = db.fetchall(
             "SELECT * FROM quests WHERE campaign_id=? AND status='active' ORDER BY created_at DESC",
@@ -412,7 +412,7 @@ class GenerateCog(commands.Cog, name="Generate"):
     async def encounter_list(self, interaction: discord.Interaction):
         cid = config.get_key(interaction.guild.id, "active_campaign_id")
         if not cid:
-            await interaction.response.send_message("No active campaign.", ephemeral=True)
+            await interaction.response.send_message("No active campaign. Start one with `/campaign new [name]`, then `/campaign select` to activate it.", ephemeral=True)
             return
         rows = db.fetchall(
             "SELECT id,name,status,created_at FROM encounters WHERE campaign_id=? ORDER BY id DESC LIMIT 15",

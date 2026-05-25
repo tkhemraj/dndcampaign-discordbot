@@ -71,7 +71,7 @@ class CampaignCog(commands.Cog, name="Campaign"):
     async def campaign_info(self, interaction: discord.Interaction):
         cid = config.get_key(interaction.guild.id, "active_campaign_id")
         if not cid:
-            await interaction.response.send_message("No active campaign.", ephemeral=True)
+            await interaction.response.send_message("No active campaign. Start one with `/campaign new [name]`, then `/campaign select` to activate it.", ephemeral=True)
             return
         row = db.fetchone("SELECT * FROM campaigns WHERE id=?", (cid,))
         if not row:

@@ -34,8 +34,16 @@ def is_dm(interaction: discord.Interaction) -> bool:
 def dm_only():
     async def predicate(interaction: discord.Interaction) -> bool:
         if not is_dm(interaction):
+            from bot import config as _cfg
+            gid = interaction.guild.id if interaction.guild else None
+            dm_role_id    = _cfg.get_key(gid, "dm_role_id") if gid else None
+            dm_channel_id = _cfg.get_key(gid, "dm_channel_id") if gid else None
+            if dm_role_id or dm_channel_id:
+                hint = "Ask your server admin to give you the DM role, or run commands in the DM channel."
+            else:
+                hint = "Server admins can run `/quickstart` to configure the bot and grant DM access."
             await interaction.response.send_message(
-                "This command is restricted to the Dungeon Master.", ephemeral=True
+                f"This command is for the Dungeon Master only. {hint}", ephemeral=True
             )
             return False
         return True

@@ -95,7 +95,7 @@ class PCCog(commands.Cog, name="PlayerChars"):
     ) -> None:
         cid = config.get_key(interaction.guild.id, "active_campaign_id")
         if not cid:
-            await interaction.response.send_message("No active campaign.", ephemeral=True)
+            await interaction.response.send_message("No active campaign. Start one with `/campaign new [name]`, then `/campaign select` to activate it.", ephemeral=True)
             return
         existing = db.fetchone(
             "SELECT id FROM player_characters WHERE campaign_id=? AND name=? COLLATE NOCASE",
@@ -153,7 +153,7 @@ class PCCog(commands.Cog, name="PlayerChars"):
     async def pc_list(self, interaction: discord.Interaction) -> None:
         cid = config.get_key(interaction.guild.id, "active_campaign_id")
         if not cid:
-            await interaction.response.send_message("No active campaign.", ephemeral=True)
+            await interaction.response.send_message("No active campaign. Start one with `/campaign new [name]`, then `/campaign select` to activate it.", ephemeral=True)
             return
         rows = db.fetchall(
             "SELECT * FROM player_characters WHERE campaign_id=? AND status='active' ORDER BY name",
@@ -352,7 +352,7 @@ class PCCog(commands.Cog, name="PlayerChars"):
     async def pc_rest(self, interaction: discord.Interaction, rest_type: str) -> None:
         cid = config.get_key(interaction.guild.id, "active_campaign_id")
         if not cid:
-            await interaction.response.send_message("No active campaign.", ephemeral=True)
+            await interaction.response.send_message("No active campaign. Start one with `/campaign new [name]`, then `/campaign select` to activate it.", ephemeral=True)
             return
         rows = db.fetchall(
             "SELECT * FROM player_characters WHERE campaign_id=? AND status='active'",

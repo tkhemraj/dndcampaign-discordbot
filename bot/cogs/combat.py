@@ -903,7 +903,7 @@ class CombatCog(commands.Cog, name="Combat"):
     async def session_history(self, interaction: discord.Interaction, limit: int = 5):
         cid = config.get_key(interaction.guild.id, "active_campaign_id")
         if not cid:
-            await interaction.response.send_message("No active campaign.", ephemeral=True)
+            await interaction.response.send_message("No active campaign. Start one with `/campaign new [name]`, then `/campaign select` to activate it.", ephemeral=True)
             return
         rows = db.fetchall(
             "SELECT id,title,content,created_at FROM lore "
