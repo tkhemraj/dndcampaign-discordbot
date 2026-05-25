@@ -1,6 +1,6 @@
 # D&D Campaign Discord Bot
 
-A fully standalone Discord bot companion for Dungeon Masters running campaigns in **Wildemount** (Critical Role setting). Generate NPCs, run live combat trackers, post quest boards, and render procedural maps — all from Discord slash commands.
+A fully standalone Discord bot companion for Dungeon Masters running campaigns in **Wildemount** (Critical Role setting). Live combat tracker with HP bars and conditions, procedural NPC/quest/map generation, voice channel turn announcements, and deploy notifications — all from Discord slash commands.
 
 [![Add to Discord](https://img.shields.io/badge/Add%20to-Discord-5865F2?logo=discord&logoColor=white)](https://discord.com/api/oauth2/authorize?client_id=1507476166494392420&permissions=117760&scope=bot%20applications.commands)
 [![Live Demo](https://img.shields.io/badge/Live-Demo-7289da?logo=github)](https://tkhemraj.github.io/dndcampaign-discordbot/demo.html)
@@ -24,6 +24,11 @@ Every NPC is fully statted with Wildemount lore — race, class, faction, abilit
 BSP dungeon rooms, zone-based outdoor terrain, template interiors, and Wildemount-flavoured locations rendered as PNG — generated fresh every time, posted to the player channel with `/map share`.
 
 ![Procedural Map](docs/img/map_preview.png)
+
+### Voice Channel Announcements
+Configure a voice channel with `/setup voice_channel` and the bot joins automatically when combat starts — speaking each turn by name so nobody misses their go while the DM is narrating. Disconnects when combat ends.
+
+![Voice Channel](docs/img/voice_channel.png)
 
 > **[→ See the full interactive demo](https://tkhemraj.github.io/dndcampaign-discordbot/demo.html)**
 
@@ -59,7 +64,7 @@ cp .env.example .env
 python run.py
 ```
 
-Or deploy to Railway in one click — see [`Procfile`](Procfile) and [`railway.toml`](railway.toml).
+Or deploy to Railway in one click — see [`Procfile`](Procfile) and [`nixpacks.toml`](nixpacks.toml).
 
 ---
 
