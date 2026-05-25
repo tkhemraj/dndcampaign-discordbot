@@ -906,10 +906,10 @@
   <div class="shipped-inner">
     <span class="shipped-label">Recently shipped</span>
     <div class="shipped-items">
-      <span class="shipped-item"><span class="si-dot"></span>/roll — dice roller with adv/dis, keep-highest, modifiers</span>
-      <span class="shipped-item"><span class="si-dot"></span>185 hand-crafted library NPCs (Legendary → Standard)</span>
-      <span class="shipped-item"><span class="si-dot"></span>/npc summon + /npc speak — AI in-character dialogue</span>
-      <span class="shipped-item"><span class="si-dot"></span>/npc speak works without any API key</span>
+      <span class="shipped-item"><span class="si-dot"></span>/loot generate — CR-aware Wildemount treasure with magic items</span>
+      <span class="shipped-item"><span class="si-dot"></span>Map overhaul — 22px tiles, textured floors, wall depth</span>
+      <span class="shipped-item"><span class="si-dot"></span>/roll — full dice expression support with adv/dis</span>
+      <span class="shipped-item"><span class="si-dot"></span>185 library NPCs + /npc speak AI dialogue (no key needed)</span>
     </div>
   </div>
 </div>
@@ -1025,6 +1025,16 @@
     </div>
   </div>
   <div class="feature-card">
+    <div class="feature-icon">💰</div>
+    <div class="feature-name">Loot Generator</div>
+    <div class="feature-desc">CR-aware treasure tables with Wildemount flavour — gems, art objects, and magic items (Common through Legendary). Dunamancy crystals, Luxon shards, Volstrucker equipment, Cerberus Assembly contraband. DM previews privately, then shares to the player channel.</div>
+    <div class="feature-commands">
+      <span class="cmd-chip">/loot generate [cr]</span>
+      <span class="cmd-chip">/loot share</span>
+      <span class="cmd-chip">/loot list</span>
+    </div>
+  </div>
+  <div class="feature-card">
     <div class="feature-icon">🎲</div>
     <div class="feature-name">Dice Roller</div>
     <div class="feature-desc">Full dice expression support for the whole table. Advantage and disadvantage, keep-highest stat rolling (4d6kh3), flat modifiers. Critical hits glow gold. DMs can roll secretly with <code>secret:True</code>.</div>
@@ -1051,15 +1061,6 @@
         <div class="roadmap-title">Player Character Registration</div>
         <div class="roadmap-desc">Players register their own characters with <code>/character create</code>. Characters auto-join combat with correct stats, track their own HP, and appear in the tracker with a player icon rather than a monster icon.</div>
         <span class="roadmap-tag rt-player">Player-Facing</span>
-      </div>
-    </div>
-
-    <div class="roadmap-card">
-      <div class="roadmap-icon ri-loot">💰</div>
-      <div class="roadmap-body">
-        <div class="roadmap-title">Loot Generator</div>
-        <div class="roadmap-desc">Challenge-rating-aware treasure tables with Wildemount-specific magic items (dunamancy crystals, Luxon shards). <code>/loot generate [cr]</code> posts a loot card; <code>/loot claim [item]</code> lets players mark items taken.</div>
-        <span class="roadmap-tag rt-qol">Quality of Life</span>
       </div>
     </div>
 

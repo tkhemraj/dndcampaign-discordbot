@@ -47,6 +47,7 @@ Configure a voice channel with `/setup voice_channel` and the bot joins automati
 | **Procedural maps** | `/map generate`, `/map share` | DM previews privately; share posts PNG to channel |
 | **Session recaps** | `/session log` | Posts rich embed to player channel |
 | **Encounter builder** | `/encounter generate` | DM only (ephemeral) — named from roster, ready for `/combat start` |
+| **Loot generator** | `/loot generate`, `/loot share`, `/loot list` | DM generates CR-aware Wildemount treasure (gems, art, magic items Common→Legendary); share to player channel |
 | **Dice roller** | `/roll` | Any player or the DM — full expression support with advantage, keep-highest, and secret rolls |
 | **Multi-campaign** | `/campaign new/select` | Multiple campaigns per server |
 | **Autocomplete everywhere** | all commands | Region, faction, difficulty, condition, status — all dropdown-driven |
@@ -153,6 +154,19 @@ Both gates can be active simultaneously — useful for having a `#dm-commands` c
 | `/combat remove <name>` | Remove a combatant |
 | `/combat status` | View tracker privately |
 | `/combat end` | End combat (embed turns green) |
+
+</details>
+
+<details>
+<summary>Loot</summary>
+
+| Command | Description |
+|---|---|
+| `/loot generate [cr]` | Generate CR-aware loot — coins, gems, art objects, magic items (DM-only, ephemeral) |
+| `/loot share <loot_id>` | Post loot card to the player channel |
+| `/loot list` | List recent loot cards with IDs |
+
+**Magic item rarities scale with CR:** Common (CR 1–3) · Uncommon (CR 4–7) · Rare (CR 8–12) · Very Rare (CR 13–17) · Legendary (CR 18+)
 
 </details>
 

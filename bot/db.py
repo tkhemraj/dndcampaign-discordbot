@@ -99,6 +99,17 @@ CREATE TABLE IF NOT EXISTS maps (
     map_data     TEXT NOT NULL,
     created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS loot (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    campaign_id  INTEGER REFERENCES campaigns(id) ON DELETE CASCADE,
+    cr           INTEGER DEFAULT 0,
+    gold         INTEGER DEFAULT 0,
+    items        TEXT DEFAULT '[]',
+    claimed      TEXT DEFAULT '[]',
+    shared       INTEGER DEFAULT 0,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 
