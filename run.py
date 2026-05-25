@@ -21,6 +21,7 @@ COGS = [
     "bot.cogs.generate",
     "bot.cogs.maps",
     "bot.cogs.combat",
+    "bot.cogs.dice",
 ]
 
 intents = discord.Intents.default()

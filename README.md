@@ -47,11 +47,13 @@ Configure a voice channel with `/setup voice_channel` and the bot joins automati
 | **Procedural maps** | `/map generate`, `/map share` | DM previews privately; share posts PNG to channel |
 | **Session recaps** | `/session log` | Posts rich embed to player channel |
 | **Encounter builder** | `/encounter generate` | DM only (ephemeral) — named from roster, ready for `/combat start` |
+| **Dice roller** | `/roll` | Any player or the DM — full expression support with advantage, keep-highest, and secret rolls |
 | **Multi-campaign** | `/campaign new/select` | Multiple campaigns per server |
 | **Autocomplete everywhere** | all commands | Region, faction, difficulty, condition, status — all dropdown-driven |
 
 **Map types:** `dungeon` · `outdoor` · `interior` · `wildemount`  
-**Dungeon subtypes:** `generic` · `underdark` · `crypt` · `sewers` · `cerberus_lab` · `bazzoxan`
+**Dungeon subtypes:** `generic` · `underdark` · `crypt` · `sewers` · `cerberus_lab` · `bazzoxan`  
+**Dice expressions:** `1d20` · `2d6+3` · `4d6kh3` · `1d20 adv` · `1d20 dis` · `2d8-1`
 
 ---
 
@@ -151,6 +153,18 @@ Both gates can be active simultaneously — useful for having a `#dm-commands` c
 | `/combat remove <name>` | Remove a combatant |
 | `/combat status` | View tracker privately |
 | `/combat end` | End combat (embed turns green) |
+
+</details>
+
+<details>
+<summary>Dice</summary>
+
+| Command | Description |
+|---|---|
+| `/roll <expression>` | Roll dice — posted to channel for all players to see |
+| `/roll <expression> secret:True` | Secret roll — ephemeral, only you see it |
+
+**Syntax:** `1d20` · `2d6+3` · `4d6kh3` (keep highest 3) · `2d20kl1` (keep lowest 1) · `1d20 adv` · `1d20 dis`
 
 </details>
 

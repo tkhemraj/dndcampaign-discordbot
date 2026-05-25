@@ -418,6 +418,96 @@
   .voice-play-btn:disabled { opacity: .35; cursor: default; }
 
   /* ── Roadmap ────────────────────────────────────────────────────── */
+  /* Dice demo */
+  .dice-demo-wrap {
+    max-width: 640px;
+    margin: 0 auto 60px;
+    padding: 0 20px;
+  }
+  .dice-demo-shell {
+    background: var(--embed-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .dice-examples { display: flex; flex-wrap: wrap; gap: 8px; }
+  .dice-ex-btn {
+    background: rgba(88,101,242,.12);
+    border: 1px solid rgba(88,101,242,.3);
+    color: #8b98f8;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 13px;
+    font-family: monospace;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  .dice-ex-btn:hover { background: rgba(88,101,242,.25); border-color: rgba(88,101,242,.6); }
+  .dice-input-row { display: flex; gap: 10px; }
+  .dice-input {
+    flex: 1;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--white);
+    font-size: 16px;
+    font-family: monospace;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .dice-input:focus { border-color: var(--brand); }
+  .dice-roll-btn {
+    background: var(--brand);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 22px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity .15s;
+    font-family: inherit;
+  }
+  .dice-roll-btn:hover { opacity: .85; }
+  .dice-result-area { min-height: 80px; display: flex; align-items: center; justify-content: center; }
+  .dice-result-card {
+    width: 100%;
+    border-radius: 8px;
+    padding: 16px 20px;
+    border-left: 4px solid var(--brand);
+    background: rgba(0,0,0,.25);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    animation: dice-pop .22s ease;
+  }
+  .dice-result-card.crit   { border-color: #FFD700; }
+  .dice-result-card.fumble { border-color: var(--red); }
+  @keyframes dice-pop { from { transform: scale(.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .dice-total {
+    font-size: 48px;
+    font-weight: 900;
+    color: var(--white);
+    line-height: 1;
+    min-width: 60px;
+    text-align: center;
+  }
+  .dice-result-card.crit   .dice-total { color: #FFD700; }
+  .dice-result-card.fumble .dice-total { color: var(--red); }
+  .dice-detail { flex: 1; }
+  .dice-label     { font-size: 12px; color: var(--muted); font-family: monospace; margin-bottom: 4px; }
+  .dice-rolls-str { font-size: 13px; color: var(--text); font-family: monospace; }
+  .dice-banner    { font-size: 13px; font-weight: 700; margin-top: 4px; }
+  .dice-result-card.crit   .dice-banner { color: #FFD700; }
+  .dice-result-card.fumble .dice-banner { color: var(--red); }
+  .die-drop { opacity: .38; text-decoration: line-through; }
+  .die-max  { color: var(--gold); font-weight: 700; }
+  .die-min  { color: #ff8888; }
+
   .roadmap {
     max-width: 960px;
     margin: 0 auto 80px;
@@ -638,6 +728,29 @@
   </div>
 </div>
 
+<!-- ── DICE DEMO ──────────────────────────────────────────────────────── -->
+<div class="section-label">Dice</div>
+<h2 class="section-title">Dice Roller</h2>
+<p class="section-desc">Full dice expression support — advantage, disadvantage, keep-highest stat rolling, flat modifiers. Anyone at the table can roll. DMs can roll secretly.</p>
+
+<div class="dice-demo-wrap">
+  <div class="dice-demo-shell">
+    <div class="dice-examples">
+      <button class="dice-ex-btn" onclick="setDiceExpr('1d20+5')">1d20+5</button>
+      <button class="dice-ex-btn" onclick="setDiceExpr('4d6kh3')">4d6kh3</button>
+      <button class="dice-ex-btn" onclick="setDiceExpr('2d8-1')">2d8-1</button>
+      <button class="dice-ex-btn" onclick="setDiceExpr('1d20 adv')">1d20 adv</button>
+      <button class="dice-ex-btn" onclick="setDiceExpr('1d20 dis')">1d20 dis</button>
+      <button class="dice-ex-btn" onclick="setDiceExpr('3d6')">3d6</button>
+    </div>
+    <div class="dice-input-row">
+      <input type="text" id="diceExpr" class="dice-input" value="1d20+5" onkeydown="if(event.key==='Enter')rollDiceDemo()">
+      <button class="dice-roll-btn" onclick="rollDiceDemo()">Roll</button>
+    </div>
+    <div id="diceResult" class="dice-result-area"></div>
+  </div>
+</div>
+
 <!-- ── VOICE DEMO ─────────────────────────────────────────────────────── -->
 <div class="section-label">Voice</div>
 <h2 class="section-title">Voice Channel Announcements</h2>
@@ -793,10 +906,10 @@
   <div class="shipped-inner">
     <span class="shipped-label">Recently shipped</span>
     <div class="shipped-items">
+      <span class="shipped-item"><span class="si-dot"></span>/roll — dice roller with adv/dis, keep-highest, modifiers</span>
       <span class="shipped-item"><span class="si-dot"></span>185 hand-crafted library NPCs (Legendary → Standard)</span>
-      <span class="shipped-item"><span class="si-dot"></span>/npc library — browse + filter by tier &amp; region</span>
-      <span class="shipped-item"><span class="si-dot"></span>/npc summon — pull any library NPC into your campaign</span>
-      <span class="shipped-item"><span class="si-dot"></span>/npc speak — AI dialogue · works without any API key</span>
+      <span class="shipped-item"><span class="si-dot"></span>/npc summon + /npc speak — AI in-character dialogue</span>
+      <span class="shipped-item"><span class="si-dot"></span>/npc speak works without any API key</span>
     </div>
   </div>
 </div>
@@ -911,6 +1024,17 @@
       <span class="cmd-chip">Railway env vars</span>
     </div>
   </div>
+  <div class="feature-card">
+    <div class="feature-icon">🎲</div>
+    <div class="feature-name">Dice Roller</div>
+    <div class="feature-desc">Full dice expression support for the whole table. Advantage and disadvantage, keep-highest stat rolling (4d6kh3), flat modifiers. Critical hits glow gold. DMs can roll secretly with <code>secret:True</code>.</div>
+    <div class="feature-commands">
+      <span class="cmd-chip">/roll 1d20+5</span>
+      <span class="cmd-chip">/roll 4d6kh3</span>
+      <span class="cmd-chip">/roll 1d20 adv</span>
+      <span class="cmd-chip">secret:True</span>
+    </div>
+  </div>
 </div>
 
 <!-- ── ROADMAP ───────────────────────────────────────────────────────── -->
@@ -927,15 +1051,6 @@
         <div class="roadmap-title">Player Character Registration</div>
         <div class="roadmap-desc">Players register their own characters with <code>/character create</code>. Characters auto-join combat with correct stats, track their own HP, and appear in the tracker with a player icon rather than a monster icon.</div>
         <span class="roadmap-tag rt-player">Player-Facing</span>
-      </div>
-    </div>
-
-    <div class="roadmap-card">
-      <div class="roadmap-icon ri-dice">🎲</div>
-      <div class="roadmap-body">
-        <div class="roadmap-title">Dice Roller with Roll History</div>
-        <div class="roadmap-desc">Full dice expression parser: <code>/roll 4d6kh3</code>, <code>/roll 1d20+5 adv</code>. Results posted to player channel. The DM gets secret rolls. Track roll history per session for dispute resolution.</div>
-        <span class="roadmap-tag rt-qol">Quality of Life</span>
       </div>
     </div>
 
@@ -1392,6 +1507,93 @@ function speakVoiceDemo() {
     synth.speak(u);
   }
   next();
+}
+
+// ── Dice demo ────────────────────────────────────────────────────────────────
+function setDiceExpr(expr) {
+  document.getElementById('diceExpr').value = expr;
+  rollDiceDemo();
+}
+
+function parseDice(expression) {
+  const raw = expression.trim().toLowerCase();
+  let str = raw;
+  const adv = /\b(adv(antage)?)\s*$/.test(str);
+  const dis = /\b(dis(advantage)?)\s*$/.test(str);
+  if (adv || dis) str = str.replace(/\s*(adv(antage)?|dis(advantage)?)\s*$/, '');
+
+  const m = str.replace(/\s/g,'').match(/^(\d+)d(\d+)(?:(kh|kl)(\d+))?([+-]\d+)?$/);
+  if (!m) throw new Error(`Can't parse "${expression}". Try: 1d20+5 · 4d6kh3 · 1d20 adv`);
+
+  let count = parseInt(m[1]), sides = parseInt(m[2]);
+  let keepMode = m[3] || null, keepN = m[4] ? parseInt(m[4]) : null;
+  const modifier = m[5] ? parseInt(m[5]) : 0;
+
+  if (adv)      { count = 2; keepMode = 'kh'; keepN = 1; }
+  else if (dis) { count = 2; keepMode = 'kl'; keepN = 1; }
+
+  if (count < 1 || count > 100) throw new Error('Dice count must be 1–100.');
+  if (sides < 2 || sides > 1000) throw new Error('Die sides must be 2–1000.');
+
+  const rolls = Array.from({length: count}, () => Math.ceil(Math.random() * sides));
+  let kept;
+  if (keepMode === 'kh' && keepN) kept = [...rolls].sort((a,b)=>b-a).slice(0, keepN);
+  else if (keepMode === 'kl' && keepN) kept = [...rolls].sort((a,b)=>a-b).slice(0, keepN);
+  else kept = [...rolls];
+
+  const total = kept.reduce((s,x) => s+x, 0) + modifier;
+
+  let label = `${count}d${sides}`;
+  if (adv) label = '2d20 advantage';
+  else if (dis) label = '2d20 disadvantage';
+  else if (keepMode && keepN) label = `${count}d${sides} keep ${keepMode==='kh'?'highest':'lowest'} ${keepN}`;
+  if (modifier) label += ` ${modifier > 0 ? '+' : ''}${modifier}`;
+
+  return { rolls, kept, modifier, total, sides, label,
+    isCrit: sides === 20 && kept.length === 1 && kept[0] === 20,
+    isFumble: sides === 20 && kept.length === 1 && kept[0] === 1 };
+}
+
+function rollDiceDemo() {
+  const expr = document.getElementById('diceExpr').value.trim();
+  const area = document.getElementById('diceResult');
+  if (!expr) return;
+
+  let result;
+  try { result = parseDice(expr); }
+  catch(e) {
+    area.innerHTML = `<div style="color:var(--red);font-size:14px">${e.message}</div>`;
+    return;
+  }
+
+  // Build rolls display
+  const keptRemaining = [...result.kept];
+  const rollSpans = result.rolls.map(d => {
+    const idx = keptRemaining.indexOf(d);
+    if (idx !== -1) {
+      keptRemaining.splice(idx, 1);
+      if (d === result.sides) return `<span class="die-max">${d}</span>`;
+      if (d === 1 && result.sides !== 2) return `<span class="die-min">${d}</span>`;
+      return `<span>${d}</span>`;
+    }
+    return `<span class="die-drop">${d}</span>`;
+  }).join(', ');
+
+  let modStr = '';
+  if (result.modifier) modStr = ` <span style="color:var(--muted)">${result.modifier > 0 ? '+' : ''}${result.modifier}</span>`;
+
+  const cls = result.isCrit ? 'crit' : result.isFumble ? 'fumble' : '';
+  const banner = result.isCrit ? '⚡ Critical Hit!' : result.isFumble ? '💀 Critical Fumble.' : '';
+
+  area.innerHTML = `
+    <div class="dice-result-card ${cls}">
+      <div class="dice-total">${result.total}</div>
+      <div class="dice-detail">
+        <div class="dice-label">${result.label}</div>
+        <div class="dice-rolls-str">[${rollSpans}]${modStr}</div>
+        ${banner ? `<div class="dice-banner">${banner}</div>` : ''}
+      </div>
+    </div>`;
 }
 
 // ── Wire demos to scroll-into-view ───────────────────────────────────────────
