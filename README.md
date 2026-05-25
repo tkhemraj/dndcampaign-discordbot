@@ -41,12 +41,13 @@ Configure a voice channel with `/setup voice_channel` and the bot joins automati
 | **Live combat tracker** | `/combat start/next/hp/end` | DM controls privately; players see live embed |
 | **Voice turn announcements** | `/setup voice_channel` | Bot joins VC on combat start, announces each turn via TTS, disconnects on end |
 | **Deploy announcements** | automatic | Posts a green embed to player channel on every restart — shows commit SHA and what changed |
-| **NPC generation** | `/npc generate` | DM only (ephemeral) — fully statted, Wildemount lore |
+| **NPC generation** | `/npc generate`, `/npc view`, `/npc list` | DM only (ephemeral) — fully statted, Wildemount lore, saved to DB |
 | **Quest board** | `/quest generate`, `/quest board` | DM generates; board posts to player channel |
 | **Procedural maps** | `/map generate`, `/map share` | DM previews privately; share posts PNG to channel |
 | **Session recaps** | `/session log` | Posts rich embed to player channel |
-| **Encounter builder** | `/encounter generate` | DM only (ephemeral) |
+| **Encounter builder** | `/encounter generate` | DM only (ephemeral) — named from roster, ready for `/combat start` |
 | **Multi-campaign** | `/campaign new/select` | Multiple campaigns per server |
+| **Autocomplete everywhere** | all commands | Region, faction, difficulty, condition, status — all dropdown-driven |
 
 **Map types:** `dungeon` · `outdoor` · `interior` · `wildemount`  
 **Dungeon subtypes:** `generic` · `underdark` · `crypt` · `sewers` · `cerberus_lab` · `bazzoxan`
@@ -112,11 +113,12 @@ Both gates can be active simultaneously — useful for having a `#dm-commands` c
 
 | Command | Description |
 |---|---|
-| `/npc generate [region] [faction]` | Generate + save a fully statted NPC (ephemeral) |
-| `/npc list [status]` | List saved NPCs |
-| `/quest generate [region] [faction]` | Generate + save a quest hook (ephemeral) |
+| `/npc generate [region] [faction]` | Generate + save a fully statted NPC (ephemeral) — region and faction are dropdown-autocompleted |
+| `/npc view <id>` | View a saved NPC's full stat card by ID |
+| `/npc list [status]` | List saved NPCs (status: Alive / Dead / Unknown) |
+| `/quest generate [region] [faction]` | Generate + save a quest hook (ephemeral) — region and faction are dropdown-autocompleted |
 | `/quest board` | Post all active quests → player channel |
-| `/encounter generate [size] [level] [difficulty]` | Generate + save an encounter |
+| `/encounter generate [size] [level] [difficulty]` | Generate + save an encounter — named from its actual roster (e.g. "Ambush: 3× Gnoll, Gnoll Pack Lord") |
 
 </details>
 
@@ -140,7 +142,7 @@ Both gates can be active simultaneously — useful for having a `#dm-commands` c
 | `/combat next` | Advance turn (embed updates live) |
 | `/combat hp <name> <delta>` | Heal or damage (`+5`, `-12`) |
 | `/combat add <name> <hp> [ac] [initiative]` | Add combatant mid-fight |
-| `/combat condition <name> <condition>` | Apply/remove a condition |
+| `/combat condition <name> <condition>` | Apply/remove a condition — all 15 D&D 5e conditions autocompleted |
 | `/combat notes <name> <notes>` | Set combatant notes |
 | `/combat remove <name>` | Remove a combatant |
 | `/combat status` | View tracker privately |

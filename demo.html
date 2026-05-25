@@ -497,6 +497,54 @@
   }
   .hp-animate { animation: hpDrop .5s ease; }
 
+  /* ── Shipped callout ────────────────────────────────────────────── */
+  .shipped-bar {
+    max-width: 960px;
+    margin: 0 auto 40px;
+    padding: 0 20px;
+  }
+  .shipped-inner {
+    background: linear-gradient(135deg, rgba(88,101,242,.12) 0%, rgba(68,170,68,.08) 100%);
+    border: 1px solid rgba(88,101,242,.3);
+    border-radius: 12px;
+    padding: 20px 28px;
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .shipped-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--brand);
+    white-space: nowrap;
+  }
+  .shipped-items {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex: 1;
+  }
+  .shipped-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,.05);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .shipped-item .si-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    flex-shrink: 0;
+  }
+
   /* ── Responsive ─────────────────────────────────────────────────── */
   @media (max-width: 680px) {
     .discord-shell { height: auto; flex-direction: column; }
@@ -738,7 +786,18 @@
 <!-- ── FEATURE GRID ───────────────────────────────────────────────────── -->
 <div class="section-label">All features</div>
 <h2 class="section-title">Everything in the box</h2>
-<p class="section-desc">Every command the bot supports, grouped by purpose.</p>
+<p class="section-desc">Every command the bot supports, grouped by purpose. Dropdown autocomplete on every parameter that has valid values — no more guessing region names or condition spellings.</p>
+
+<div class="shipped-bar">
+  <div class="shipped-inner">
+    <span class="shipped-label">Recently shipped</span>
+    <div class="shipped-items">
+      <span class="shipped-item"><span class="si-dot"></span>Autocomplete dropdowns on all commands</span>
+      <span class="shipped-item"><span class="si-dot"></span>/npc view &lt;id&gt; — retrieve any saved NPC</span>
+      <span class="shipped-item"><span class="si-dot"></span>Encounter names built from roster</span>
+    </div>
+  </div>
+</div>
 
 <div class="features-grid">
   <div class="feature-card">
@@ -756,9 +815,10 @@
   <div class="feature-card">
     <div class="feature-icon">🧙</div>
     <div class="feature-name">NPC Generator</div>
-    <div class="feature-desc">Full Wildemount-flavoured NPCs with stats, personalities, ideals, bonds, flaws, and backstories. Saved to the campaign database.</div>
+    <div class="feature-desc">Full Wildemount-flavoured NPCs with stats, personalities, ideals, bonds, flaws, and backstories. Saved to the campaign database — pull any NPC back up mid-session by ID.</div>
     <div class="feature-commands">
       <span class="cmd-chip">/npc generate</span>
+      <span class="cmd-chip">/npc view</span>
       <span class="cmd-chip">/npc list</span>
     </div>
   </div>
@@ -784,7 +844,7 @@
   <div class="feature-card">
     <div class="feature-icon">⚔️</div>
     <div class="feature-name">Encounter Generator</div>
-    <div class="feature-desc">Party-size and level-aware encounter generation. Outputs a full combatant roster ready to start immediately with <code>/combat start</code>.</div>
+    <div class="feature-desc">Party-size and level-aware encounter generation. Named from its actual roster — <em>"Ambush: 3× Gnoll, Gnoll Pack Lord"</em> — and ready to start immediately with <code>/combat start</code>.</div>
     <div class="feature-commands">
       <span class="cmd-chip">/encounter generate</span>
     </div>
@@ -851,7 +911,7 @@
 <!-- ── ROADMAP ───────────────────────────────────────────────────────── -->
 <div class="section-label">What's next</div>
 <h2 class="section-title">Ideas for v2</h2>
-<p class="section-desc">Seven things worth building next, ranked roughly by impact.</p>
+<p class="section-desc">Seven things worth building next, ranked roughly by impact on the table.</p>
 
 <div class="roadmap">
   <div class="roadmap-grid">
@@ -860,7 +920,7 @@
       <div class="roadmap-icon ri-claude">🤖</div>
       <div class="roadmap-body">
         <div class="roadmap-title">AI NPC Dialogue (Claude API)</div>
-        <div class="roadmap-desc">Wire in the Anthropic API so the DM can type <code>/npc speak [id] "what do you want?"</code> and get an in-character reply seeded from that NPC's faction, personality, and backstory. Cheap per call; could be cached with prompt caching.</div>
+        <div class="roadmap-desc">Wire in the Anthropic API so the DM can type <code>/npc speak [id] "what do you want?"</code> and get an in-character reply seeded from that NPC's faction, personality, and full backstory. Each NPC speaks in its own voice — no generic responses.</div>
         <span class="roadmap-tag rt-ai">AI Feature</span>
       </div>
     </div>
