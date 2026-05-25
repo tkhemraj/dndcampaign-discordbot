@@ -34,6 +34,8 @@ BSP dungeon rooms, zone-based outdoor terrain, template interiors, and Wildemoun
 | Feature | Commands | Who sees it |
 |---|---|---|
 | **Live combat tracker** | `/combat start/next/hp/end` | DM controls privately; players see live embed |
+| **Voice turn announcements** | `/setup voice_channel` | Bot joins VC on combat start, announces each turn via TTS, disconnects on end |
+| **Deploy announcements** | automatic | Posts a green embed to player channel on every restart — shows commit SHA and what changed |
 | **NPC generation** | `/npc generate` | DM only (ephemeral) — fully statted, Wildemount lore |
 | **Quest board** | `/quest generate`, `/quest board` | DM generates; board posts to player channel |
 | **Procedural maps** | `/map generate`, `/map share` | DM previews privately; share posts PNG to channel |
@@ -66,11 +68,12 @@ Or deploy to Railway in one click — see [`Procfile`](Procfile) and [`railway.t
 Run these as the DM after adding the bot:
 
 ```
-/setup role      @Dungeon Master       ← grants DM commands via role
-/setup dm_channel #dm-commands         ← OR restrict by channel
-/setup player_channel #session-log     ← where the bot posts public updates
-/campaign new    "The Wildemount War"  ← creates and activates a campaign
-/setup status                          ← confirm everything is wired up
+/setup role           @Dungeon Master       ← grants DM commands via role
+/setup dm_channel     #dm-commands         ← OR restrict by channel
+/setup player_channel #session-log         ← where the bot posts public updates
+/setup voice_channel  #General             ← optional: VC for combat TTS announcements
+/campaign new         "The Wildemount War" ← creates and activates a campaign
+/setup status                              ← confirm everything is wired up
 ```
 
 ---
@@ -147,6 +150,19 @@ Both gates can be active simultaneously — useful for having a `#dm-commands` c
 |---|---|
 | `/session log <title> <notes>` | Post session recap → player channel |
 | `/session history [limit]` | Show recent session recaps |
+
+</details>
+
+<details>
+<summary>Setup</summary>
+
+| Command | Description |
+|---|---|
+| `/setup role <role>` | Set the DM role |
+| `/setup dm_channel <channel>` | Set the DM-only text channel |
+| `/setup player_channel <channel>` | Set the player text channel |
+| `/setup voice_channel <channel>` | Set the voice channel for combat TTS announcements |
+| `/setup status` | Show current configuration |
 
 </details>
 

@@ -783,12 +783,30 @@
       <span class="cmd-chip">Shared DB</span>
     </div>
   </div>
+  <div class="feature-card">
+    <div class="feature-icon">🔊</div>
+    <div class="feature-name">Voice Channel Announcements</div>
+    <div class="feature-desc">The bot joins a configured voice channel when combat starts and announces each turn via TTS — <em>"Draketooth, round 2."</em> Disconnects automatically when combat ends.</div>
+    <div class="feature-commands">
+      <span class="cmd-chip">/setup voice_channel</span>
+      <span class="cmd-chip">gTTS · ffmpeg</span>
+    </div>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon">✅</div>
+    <div class="feature-name">Deploy Announcements</div>
+    <div class="feature-desc">On every restart the bot posts a green embed to the player channel showing the commit SHA and what was deployed — so players know when the bot is back online after an update.</div>
+    <div class="feature-commands">
+      <span class="cmd-chip">on_ready embed</span>
+      <span class="cmd-chip">Railway env vars</span>
+    </div>
+  </div>
 </div>
 
 <!-- ── ROADMAP ───────────────────────────────────────────────────────── -->
 <div class="section-label">What's next</div>
 <h2 class="section-title">Ideas for v2</h2>
-<p class="section-desc">Eight things worth building next, ranked roughly by impact.</p>
+<p class="section-desc">Seven things worth building next, ranked roughly by impact.</p>
 
 <div class="roadmap">
   <div class="roadmap-grid">
@@ -826,15 +844,6 @@
         <div class="roadmap-title">Loot Generator</div>
         <div class="roadmap-desc">Challenge-rating-aware treasure tables with Wildemount-specific magic items (dunamancy crystals, Luxon shards). <code>/loot generate [cr]</code> posts a loot card; <code>/loot claim [item]</code> lets players mark items taken.</div>
         <span class="roadmap-tag rt-qol">Quality of Life</span>
-      </div>
-    </div>
-
-    <div class="roadmap-card">
-      <div class="roadmap-icon ri-voice">🔊</div>
-      <div class="roadmap-body">
-        <div class="roadmap-title">Voice Channel Announcements</div>
-        <div class="roadmap-desc">When combat advances, the bot joins the voice channel and speaks the turn announcement via TTS: <em>"Seraphina's turn — Round 3."</em> No more missing whose turn it is while the DM is narrating.</div>
-        <span class="roadmap-tag rt-big">Big Feature</span>
       </div>
     </div>
 
