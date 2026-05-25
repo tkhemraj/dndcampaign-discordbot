@@ -4,6 +4,42 @@ import random
 from .data.monsters import MONSTERS, CR_TO_XP, DIFFICULTY_THRESHOLDS
 
 
+_AMBUSH_PREFIXES   = ["Ambush:", "Skirmish:", "Assault:", "Trap:"]
+_HORDE_PREFIXES    = ["Horde:", "Swarm:", "Wave:", "Mob:"]
+_BOSS_PREFIXES     = ["Confrontation:", "Showdown:", "Duel:", "Reckoning:"]
+_MIXED_PREFIXES    = ["Encounter:", "Clash:", "Fray:", "Melee:"]
+
+
+def _encounter_name(combatants: list[dict], difficulty: str, rng: random.Random) -> str:
+    if not combatants:
+        return f"{difficulty.title()} Encounter"
+
+    name_counts: dict[str, int] = {}
+    for c in combatants:
+        name_counts[c["name"]] = name_counts.get(c["name"], 0) + 1
+
+    # Build roster string like "3× Gnoll, 1× Gnoll Pack Lord"
+    sorted_entries = sorted(name_counts.items(), key=lambda x: -x[1])
+    roster = ", ".join(
+        f"{n}× {name}" if n > 1 else name
+        for name, n in sorted_entries[:3]
+    )
+    if len(sorted_entries) > 3:
+        roster += f" +{len(sorted_entries) - 3} more"
+
+    total = len(combatants)
+    if total == 1:
+        prefix = rng.choice(_BOSS_PREFIXES)
+    elif total >= 5:
+        prefix = rng.choice(_HORDE_PREFIXES)
+    elif difficulty == "deadly":
+        prefix = rng.choice(_AMBUSH_PREFIXES)
+    else:
+        prefix = rng.choice(_MIXED_PREFIXES)
+
+    return f"{prefix} {roster}"
+
+
 def generate(
     campaign_id: int | None,
     party_size: int = 4,
@@ -59,9 +95,11 @@ def generate(
             type_counts[m["type"]] = type_counts.get(m["type"], 0) + 1
     dominant_type = max(type_counts, key=lambda t: type_counts[t]) if type_counts else "humanoid"
 
+    name = _encounter_name(combatants, difficulty, rng)
+
     return {
         "campaign_id":   campaign_id,
-        "name":          f"{difficulty.title()} Encounter",
+        "name":          name,
         "difficulty":    difficulty,
         "status":        "planned",
         "notes":         f"Est. {total_xp} XP for {party_size} level-{party_level} characters",
