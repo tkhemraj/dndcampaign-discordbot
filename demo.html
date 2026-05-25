@@ -405,6 +405,18 @@
     border: 1px solid rgba(88,101,242,.3);
   }
 
+  /* ── Voice channel sidebar ─────────────────────────────────────── */
+  .d-vc-row { padding: 4px 8px; border-radius: 4px; margin: 1px 4px; font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .d-vc-members-list { padding-left: 20px; }
+  .d-vc-member { display: flex; align-items: center; gap: 6px; padding: 2px 4px; font-size: 13px; color: var(--muted); }
+  .d-vc-av { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 900; color: #fff; }
+  .speaking-ring { box-shadow: 0 0 0 2px #3ba55c; animation: speaking-pulse .8s ease-in-out infinite; }
+  @keyframes speaking-pulse { 0%,100%{box-shadow:0 0 0 2px #3ba55c;} 50%{box-shadow:0 0 0 4px #57d984;} }
+  .voice-play-wrap { text-align: center; margin: -44px auto 60px; }
+  .voice-play-btn { background: rgba(88,101,242,.12); border: 1px solid rgba(88,101,242,.35); color: #8b98f8; border-radius: 20px; padding: 8px 22px; font-size: 14px; cursor: pointer; font-family: inherit; transition: background .15s, border-color .15s; }
+  .voice-play-btn:hover { background: rgba(88,101,242,.25); border-color: rgba(88,101,242,.6); }
+  .voice-play-btn:disabled { opacity: .35; cursor: default; }
+
   /* ── Roadmap ────────────────────────────────────────────────────── */
   .roadmap {
     max-width: 960px;
@@ -575,6 +587,39 @@
       <div class="d-input">Message #dm-commands</div>
     </div>
   </div>
+</div>
+
+<!-- ── VOICE DEMO ─────────────────────────────────────────────────────── -->
+<div class="section-label">Voice</div>
+<h2 class="section-title">Voice Channel Announcements</h2>
+<p class="section-desc">Set a voice channel with <code>/setup voice_channel</code> and the bot joins when combat starts — announcing each turn by name so nobody misses their go while the DM is narrating.</p>
+
+<div class="discord-shell" id="voiceShell">
+  <div class="d-sidebar"><div class="d-server-icon">D</div></div>
+  <div class="d-channels">
+    <div class="d-server-name">The Wildemount War<span>▾</span></div>
+    <div class="d-category">Text Channels</div>
+    <div class="d-channel"><span class="d-channel-hash">#</span>session-log</div>
+    <div class="d-category">DM Only</div>
+    <div class="d-channel active"><span class="d-channel-hash">#</span>dm-commands</div>
+    <div class="d-category">Voice Channels</div>
+    <div class="d-vc-row"><span style="font-size:13px">🔊</span> General</div>
+    <div class="d-vc-members-list" id="vcMembers"></div>
+  </div>
+  <div class="d-main">
+    <div class="d-topbar">
+      <span class="d-topbar-hash">#</span>
+      <span class="d-topbar-name">dm-commands</span>
+      <span class="d-topbar-desc">DM-only channel</span>
+    </div>
+    <div class="d-messages" id="voiceMessages"></div>
+    <div class="d-input-area">
+      <div class="d-input">Message #dm-commands</div>
+    </div>
+  </div>
+</div>
+<div class="voice-play-wrap">
+  <button id="voicePlayBtn" class="voice-play-btn" onclick="speakVoiceDemo()">🔊 Hear the announcements</button>
 </div>
 
 <!-- ── MAP DEMO ──────────────────────────────────────────────────────── -->
@@ -1160,6 +1205,101 @@ async function runNpcDemo() {
   }
 }
 
+// ── Voice demo ───────────────────────────────────────────────────────────────
+
+function _vcMember(name, color, speaking) {
+  return `<div class="d-vc-member">
+    <div class="d-vc-av${speaking ? ' speaking-ring' : ''}" style="background:${color}">${name[0]}</div>
+    <span style="color:${speaking ? '#3ba55c' : 'var(--muted)'};font-size:13px">${name}</span>
+    ${speaking ? '<span style="color:#3ba55c;font-size:11px;margin-left:auto">●</span>' : ''}
+  </div>`;
+}
+
+function _setVc(speaking) {
+  const el = document.getElementById('vcMembers');
+  if (!el) return;
+  el.innerHTML =
+    _vcMember('Seraphina', '#5865f2', speaking === 'bot') +
+    _vcMember('Corvus',    '#44aa44', false) +
+    _vcMember('Mira',      '#dd6622', false) +
+    (speaking !== 'absent' ? _vcMember('CampaignBot', '#5865f2', speaking === 'bot') : '');
+}
+
+async function runVoiceDemo() {
+  const msgs = document.getElementById('voiceMessages');
+  // Players in VC, bot not yet
+  _setVc('absent');
+  await sleep(700);
+
+  msgs.appendChild(dmMsg('<span class="slash-cmd">/combat start</span> encounter_id: 3', 0));
+  msgs.scrollTop = msgs.scrollHeight;
+  await sleep(900);
+
+  msgs.appendChild(botMsg(
+    '<div class="msg-text">⚔️ Combat started in <strong>#session-log</strong>.</div>' +
+    '<div class="msg-ephemeral">🔒 Only you can see this</div>', 0
+  ));
+  msgs.scrollTop = msgs.scrollHeight;
+
+  // Bot joins VC, immediately announces first turn
+  _setVc('bot');
+  await sleep(3000);
+
+  _setVc('idle');
+  await sleep(1200);
+
+  msgs.appendChild(dmMsg('<span class="slash-cmd">/combat next</span>', 0));
+  msgs.scrollTop = msgs.scrollHeight;
+  await sleep(600);
+  msgs.appendChild(botMsg('<div class="msg-text">→ <strong>Draketooth</strong></div><div class="msg-ephemeral">🔒 Only you can see this</div>', 0));
+  msgs.scrollTop = msgs.scrollHeight;
+  _setVc('bot');
+  await sleep(2200);
+
+  _setVc('idle');
+  await sleep(1200);
+
+  msgs.appendChild(dmMsg('<span class="slash-cmd">/combat end</span>', 0));
+  msgs.scrollTop = msgs.scrollHeight;
+  await sleep(600);
+  msgs.appendChild(botMsg('<div class="msg-text">Combat ended.</div><div class="msg-ephemeral">🔒 Only you can see this</div>', 0));
+  msgs.scrollTop = msgs.scrollHeight;
+  _setVc('bot');
+  await sleep(1800);
+
+  // Bot leaves VC
+  _setVc('absent');
+}
+
+function speakVoiceDemo() {
+  const synth = window.speechSynthesis;
+  if (!synth) return;
+  const btn = document.getElementById('voicePlayBtn');
+  btn.disabled = true;
+  btn.textContent = '🔊 Speaking…';
+  synth.cancel();
+
+  const lines = [
+    "Combat has begun. Ambush at the Ashkeeper Gate. Seraphina goes first.",
+    "Draketooth, round two.",
+    "Combat over.",
+  ];
+
+  let i = 0;
+  function next() {
+    if (i >= lines.length) {
+      btn.disabled = false;
+      btn.textContent = '🔊 Hear again';
+      return;
+    }
+    const u = new SpeechSynthesisUtterance(lines[i++]);
+    u.rate = 0.9; u.pitch = 0.85;
+    u.onend = next;
+    synth.speak(u);
+  }
+  next();
+}
+
 // ── Wire demos to scroll-into-view ───────────────────────────────────────────
 function onceVisible(elementId, fn) {
   const el = document.getElementById(elementId);
@@ -1178,6 +1318,7 @@ function onceVisible(elementId, fn) {
 document.addEventListener('DOMContentLoaded', () => {
   onceVisible('combatShell', runCombatDemo);
   onceVisible('npcShell',    runNpcDemo);
+  onceVisible('voiceShell',  runVoiceDemo);
 });
 
 </script>
