@@ -7,6 +7,37 @@ from bot import config, db
 from bot.guard import dm_only
 from bot.generators import npc_gen, quest_gen, encounter_gen
 
+_REGION_CHOICES = [
+    app_commands.Choice(name="Western Wynandir",  value="Western Wynandir"),
+    app_commands.Choice(name="Xhorhas",           value="Xhorhas"),
+    app_commands.Choice(name="Menagerie Coast",   value="Menagerie Coast"),
+    app_commands.Choice(name="Greying Wildlands", value="Greying Wildlands"),
+    app_commands.Choice(name="Eiselcross",        value="Eiselcross"),
+]
+
+_FACTION_CHOICES = [
+    app_commands.Choice(name="Dwendalian Empire", value="Dwendalian Empire"),
+    app_commands.Choice(name="Cerberus Assembly", value="Cerberus Assembly"),
+    app_commands.Choice(name="Kryn Dynasty",      value="Kryn Dynasty"),
+    app_commands.Choice(name="Cobalt Soul",        value="Cobalt Soul"),
+    app_commands.Choice(name="The Revelry",        value="The Revelry"),
+    app_commands.Choice(name="The Myriad",         value="The Myriad"),
+    app_commands.Choice(name="The Clovis Concord", value="The Clovis Concord"),
+]
+
+_DIFFICULTY_CHOICES = [
+    app_commands.Choice(name="Easy",   value="easy"),
+    app_commands.Choice(name="Medium", value="medium"),
+    app_commands.Choice(name="Hard",   value="hard"),
+    app_commands.Choice(name="Deadly", value="deadly"),
+]
+
+_STATUS_CHOICES = [
+    app_commands.Choice(name="Alive",   value="alive"),
+    app_commands.Choice(name="Dead",    value="dead"),
+    app_commands.Choice(name="Unknown", value="unknown"),
+]
+
 
 def _mod(score: int) -> str:
     m = (score - 10) // 2
@@ -67,6 +98,7 @@ class GenerateCog(commands.Cog, name="Generate"):
     npc_group = app_commands.Group(name="npc", description="NPC tools")
 
     @npc_group.command(name="generate", description="Generate and save an NPC")
+    @app_commands.choices(region=_REGION_CHOICES, faction=_FACTION_CHOICES)
     @dm_only()
     async def npc_generate(self, interaction: discord.Interaction, region: str = "", faction: str = ""):
         await interaction.response.defer(ephemeral=True)
@@ -91,6 +123,7 @@ class GenerateCog(commands.Cog, name="Generate"):
         await interaction.followup.send(embed=embed, ephemeral=True)
 
     @npc_group.command(name="list", description="List NPCs in the active campaign")
+    @app_commands.choices(status=_STATUS_CHOICES)
     async def npc_list(self, interaction: discord.Interaction, status: str = "alive"):
         cid = config.get_key(interaction.guild.id, "active_campaign_id")
         if not cid:
@@ -119,6 +152,7 @@ class GenerateCog(commands.Cog, name="Generate"):
     quest_group = app_commands.Group(name="quest", description="Quest tools")
 
     @quest_group.command(name="generate", description="Generate and save a quest hook")
+    @app_commands.choices(region=_REGION_CHOICES, faction=_FACTION_CHOICES)
     @dm_only()
     async def quest_generate(self, interaction: discord.Interaction, region: str = "", faction: str = ""):
         await interaction.response.defer(ephemeral=True)
@@ -165,6 +199,7 @@ class GenerateCog(commands.Cog, name="Generate"):
     encounter_group = app_commands.Group(name="encounter", description="Encounter generation")
 
     @encounter_group.command(name="generate", description="Generate and save an encounter")
+    @app_commands.choices(difficulty=_DIFFICULTY_CHOICES)
     @dm_only()
     async def encounter_generate(
         self,

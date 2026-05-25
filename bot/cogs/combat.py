@@ -12,6 +12,14 @@ from bot.guard import dm_only
 
 _active: dict[int, "_Tracker"] = {}
 
+_CONDITION_CHOICES = [
+    app_commands.Choice(name=c, value=c) for c in [
+        "Blinded", "Charmed", "Deafened", "Exhaustion", "Frightened",
+        "Grappled", "Incapacitated", "Invisible", "Paralyzed", "Petrified",
+        "Poisoned", "Prone", "Restrained", "Stunned", "Unconscious",
+    ]
+]
+
 
 def _tts_to_file(text: str) -> str:
     """Generate TTS MP3 via gTTS and return a temp file path. Runs in thread executor."""
@@ -210,6 +218,7 @@ class CombatCog(commands.Cog, name="Combat"):
         await interaction.response.send_message(f"Added **{name}** (HP {hp}, AC {ac}).", ephemeral=True)
 
     @combat_group.command(name="condition", description="Apply or remove a condition")
+    @app_commands.choices(condition=_CONDITION_CHOICES)
     @dm_only()
     async def combat_condition(
         self,
