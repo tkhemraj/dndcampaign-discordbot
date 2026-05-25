@@ -25,6 +25,8 @@ COGS = [
     "bot.cogs.loot",
     "bot.cogs.pc",
     "bot.cogs.events",
+    "bot.cogs.session",
+    "bot.cogs.search",
     "bot.cogs.help",
 ]
 

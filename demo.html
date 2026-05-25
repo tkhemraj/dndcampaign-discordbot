@@ -908,10 +908,10 @@
   <div class="shipped-inner">
     <span class="shipped-label">Recently shipped</span>
     <div class="shipped-items">
+      <span class="shipped-item"><span class="si-dot"></span>Campaign Search — /search across NPCs, quests, sessions, characters</span>
+      <span class="shipped-item"><span class="si-dot"></span>Map renderer v4 — Gaussian glow, stone slab floors, 3-D wall bricks</span>
+      <span class="shipped-item"><span class="si-dot"></span>Session Recaps — /session log posts to channel, stored and searchable</span>
       <span class="shipped-item"><span class="si-dot"></span>World events — ambient events on timer or on demand, 6 types</span>
-      <span class="shipped-item"><span class="si-dot"></span>Autopilot combat — bot runs combat while DM narrates</span>
-      <span class="shipped-item"><span class="si-dot"></span>Player Characters — /pc register, spell slots, HP bar, auto-join combat</span>
-      <span class="shipped-item"><span class="si-dot"></span>Map renderer — 28px tiles, wall stone, warmth glow, torch spots</span>
     </div>
   </div>
 </div>
@@ -1089,36 +1089,36 @@
 
 <!-- ── ROADMAP ───────────────────────────────────────────────────────── -->
 <div class="section-label">What's next</div>
-<h2 class="section-title">Ideas for v3</h2>
+<h2 class="section-title">Ideas for v4</h2>
 <p class="section-desc">Things worth building next, ranked roughly by impact on the table.</p>
 
 <div class="roadmap">
   <div class="roadmap-grid">
 
     <div class="roadmap-card">
-      <div class="roadmap-icon ri-weather">🌦️</div>
-      <div class="roadmap-body">
-        <div class="roadmap-title">World Events &amp; Weather System</div>
-        <div class="roadmap-desc">Scheduled world events between sessions: faction movements, weather changes, rumours. The bot posts an "overnight report" to the player channel at the start of each session using a cron trigger.</div>
-        <span class="roadmap-tag rt-qol">Quality of Life</span>
-      </div>
-    </div>
-
-    <div class="roadmap-card">
       <div class="roadmap-icon ri-web">🌐</div>
       <div class="roadmap-body">
         <div class="roadmap-title">DM Web Dashboard</div>
-        <div class="roadmap-desc">A lightweight Flask/FastAPI web UI that mirrors the Discord commands. The DM can manage campaigns, browse NPCs, and queue up maps from a browser. Shares the same SQLite DB as the bot.</div>
+        <div class="roadmap-desc">A lightweight web UI that mirrors the Discord commands. The DM can manage campaigns, browse NPCs, queue up maps, and view the combat tracker from a browser — shares the same SQLite DB as the bot.</div>
         <span class="roadmap-tag rt-big">Big Feature</span>
       </div>
     </div>
 
     <div class="roadmap-card">
-      <div class="roadmap-icon ri-search">🔍</div>
+      <div class="roadmap-icon ri-voice">🎙️</div>
       <div class="roadmap-body">
-        <div class="roadmap-title">Campaign Search</div>
-        <div class="roadmap-desc"><code>/search [query]</code> full-text searches across all NPCs, quests, session notes, and lore entries. Returns ranked results with a preview snippet — a campaign wiki built from your actual play.</div>
-        <span class="roadmap-tag rt-player">Player-Facing</span>
+        <div class="roadmap-title">AI Narrator Voice</div>
+        <div class="roadmap-desc">TTS synthesis for combat narration — the bot speaks monster attack descriptions and world event flavour text in the voice channel, not just turn names. Uses the existing voice channel setup.</div>
+        <span class="roadmap-tag rt-ai">AI Feature</span>
+      </div>
+    </div>
+
+    <div class="roadmap-card">
+      <div class="roadmap-icon ri-player">🗺️</div>
+      <div class="roadmap-body">
+        <div class="roadmap-title">Annotated Map Pins</div>
+        <div class="roadmap-desc">Place named pins on a generated map — "<code>A: Goblin lair</code>", "<code>B: Hidden door</code>" — and the bot re-renders the map with numbered markers overlaid. Shareable with or without DM annotations.</div>
+        <span class="roadmap-tag rt-qol">Quality of Life</span>
       </div>
     </div>
 

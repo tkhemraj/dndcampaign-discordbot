@@ -48,8 +48,9 @@ Configure a voice channel with `/setup voice_channel` and the bot joins automati
 | **NPC generation + library** | `/npc generate`, `/npc library`, `/npc summon`, `/npc view`, `/npc list`, `/npc kill` | DM only (ephemeral) — procedural or hand-crafted library (185 NPCs: 5 Legendary, 10 Mega, 20 Notable, 150 Standard) |
 | **AI NPC dialogue** | `/npc speak <id> <question>` | Posts in-character reply to player channel — Anthropic, OpenAI-compatible, Ollama, or zero-dependency template fallback |
 | **Quest board** | `/quest generate`, `/quest board`, `/quest complete` | DM generates; board posts to player channel |
-| **Procedural maps** | `/map generate`, `/map share` | DM previews privately; share posts PNG to channel — 28px tiles, wall stone texture, warmth glow |
-| **Session recaps** | `/session log` | Posts rich embed to player channel |
+| **Procedural maps** | `/map generate`, `/map share` | DM previews privately; share posts PNG to channel — 32px tiles, Gaussian-blurred torch glow, stone slab floors |
+| **Session recaps** | `/session log`, `/session history` | Posts rich embed to player channel; stored and searchable |
+| **Campaign search** | `/search <query>` | Full-text search across NPCs, quests, session logs, and characters — results show type, status, and a matching snippet |
 | **Encounter builder** | `/encounter generate`, `/encounter list` | DM only (ephemeral) — named from roster, ready for `/combat start` |
 | **Loot generator** | `/loot generate`, `/loot share`, `/loot list` | DM generates CR-aware Wildemount treasure (gems, art, magic items Common→Legendary); share to player channel |
 | **Dice roller** | `/roll` | Any player or the DM — full expression support with advantage, keep-highest, and secret rolls |
@@ -294,8 +295,17 @@ HP bar displays as `█████░░░░░` (10-block bar). Registered P
 
 | Command | Description |
 |---|---|
-| `/session log <title> <notes>` | Post session recap → player channel |
-| `/session history [limit]` | Show recent session recaps |
+| `/session log <title> <notes>` | Post session recap → player channel and save to searchable history |
+| `/session history [limit]` | Show recent session recaps (DM only, ephemeral) |
+
+</details>
+
+<details>
+<summary>Search</summary>
+
+| Command | Description |
+|---|---|
+| `/search <query>` | Full-text search across all campaign records — NPCs, quests, session logs, characters; returns matching snippet and status for each result; DMs see record IDs |
 
 </details>
 
