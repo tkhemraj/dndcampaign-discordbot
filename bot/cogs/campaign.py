@@ -82,8 +82,10 @@ class CampaignCog(commands.Cog, name="Campaign"):
         encs   = db.fetchone("SELECT COUNT(*) as c FROM encounters WHERE campaign_id=?", (cid,))["c"]
         maps   = db.fetchone("SELECT COUNT(*) as c FROM maps WHERE campaign_id=?", (cid,))["c"]
         loot   = db.fetchone("SELECT COUNT(*) as c FROM loot WHERE campaign_id=?", (cid,))["c"]
+        pcs    = db.fetchone("SELECT COUNT(*) as c FROM player_characters WHERE campaign_id=? AND status='active'", (cid,))["c"]
         embed  = discord.Embed(title=row["name"], colour=0xD4A040)
         embed.add_field(name="Setting",       value=row["setting"],  inline=True)
+        embed.add_field(name="Party",         value=str(pcs),        inline=True)
         embed.add_field(name="NPCs",          value=str(npcs),       inline=True)
         embed.add_field(name="Active Quests", value=str(quests),     inline=True)
         embed.add_field(name="Encounters",    value=str(encs),       inline=True)

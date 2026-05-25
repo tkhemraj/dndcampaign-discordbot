@@ -23,6 +23,7 @@ COGS = [
     "bot.cogs.combat",
     "bot.cogs.dice",
     "bot.cogs.loot",
+    "bot.cogs.pc",
 ]
 
 intents = discord.Intents.default()

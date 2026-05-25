@@ -110,6 +110,30 @@ CREATE TABLE IF NOT EXISTS loot (
     shared       INTEGER DEFAULT 0,
     created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS player_characters (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    campaign_id      INTEGER REFERENCES campaigns(id) ON DELETE CASCADE,
+    discord_user_id  TEXT NOT NULL,
+    name             TEXT NOT NULL,
+    race             TEXT,
+    pc_class         TEXT,
+    level            INTEGER DEFAULT 1,
+    hp               INTEGER DEFAULT 10,
+    max_hp           INTEGER DEFAULT 10,
+    ac               INTEGER DEFAULT 10,
+    str_score        INTEGER DEFAULT 10,
+    dex_score        INTEGER DEFAULT 10,
+    con_score        INTEGER DEFAULT 10,
+    int_score        INTEGER DEFAULT 10,
+    wis_score        INTEGER DEFAULT 10,
+    cha_score        INTEGER DEFAULT 10,
+    spell_slots      TEXT DEFAULT '{}',
+    inspiration      INTEGER DEFAULT 0,
+    status           TEXT DEFAULT 'active',
+    notes            TEXT DEFAULT '',
+    created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 

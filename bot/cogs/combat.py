@@ -92,9 +92,10 @@ class _Tracker:
             hp, max_hp = c["hp"], c["max_hp"]
             bar  = "█" * round((hp / max_hp) * 10 if max_hp else 0)
             bar += "░" * (10 - len(bar))
-            arrow = "▶ " if cur and c["id"] == cur["id"] else "   "
-            name  = f"**{c['name']}**" if cur and c["id"] == cur["id"] else c["name"]
-            lines.append(f"{arrow}{name} — HP {hp}/{max_hp} `{bar}` AC {c['ac']}{cond_str}")
+            arrow    = "▶ " if cur and c["id"] == cur["id"] else "   "
+            name     = f"**{c['name']}**" if cur and c["id"] == cur["id"] else c["name"]
+            type_icon = "🛡️" if c.get("combatant_type") == "player" else ""
+            lines.append(f"{arrow}{type_icon}{name} — HP {hp}/{max_hp} `{bar}` AC {c['ac']}{cond_str}")
             if c.get("notes"):
                 lines.append(f"      *{c['notes']}*")
         for c in self.fallen():
@@ -119,8 +120,13 @@ class CombatCog(commands.Cog, name="Combat"):
             _active.pop(tracker.guild_id, None)
 
     @combat_group.command(name="start", description="Start a combat encounter")
+    @app_commands.describe(
+        encounter_id="Encounter ID from /encounter generate",
+        with_party="Auto-add registered PCs to this combat (default True)",
+    )
     @dm_only()
-    async def combat_start(self, interaction: discord.Interaction, encounter_id: int):
+    async def combat_start(self, interaction: discord.Interaction,
+                           encounter_id: int, with_party: bool = True):
         gid = interaction.guild.id
         if gid in _active:
             await interaction.response.send_message("Combat already running. Use /combat end first.", ephemeral=True)
@@ -130,6 +136,25 @@ class CombatCog(commands.Cog, name="Combat"):
             await interaction.response.send_message(f"No encounter {encounter_id}.", ephemeral=True)
             return
         db.execute("UPDATE encounters SET status='active', round=1, current_turn=0 WHERE id=?", (encounter_id,))
+        # Auto-import registered PCs as player-type combatants
+        if with_party:
+            cid = config.get_key(gid, "active_campaign_id")
+            if cid:
+                pcs = db.fetchall(
+                    "SELECT * FROM player_characters WHERE campaign_id=? AND status='active'",
+                    (cid,),
+                )
+                for pc in pcs:
+                    already = db.fetchone(
+                        "SELECT id FROM combatants WHERE encounter_id=? AND name=?",
+                        (encounter_id, pc["name"]),
+                    )
+                    if not already:
+                        db.execute(
+                            "INSERT INTO combatants (encounter_id,name,combatant_type,initiative,hp,max_hp,ac,conditions,notes) VALUES (?,?,?,?,?,?,?,?,?)",
+                            (encounter_id, pc["name"], "player", 0,
+                             pc["hp"], pc["max_hp"], pc["ac"], "[]", ""),
+                        )
         player_channel_id = config.get_key(gid, "player_channel_id")
         target = interaction.guild.get_channel(int(player_channel_id)) if player_channel_id else interaction.channel
         await interaction.response.defer(ephemeral=True)
