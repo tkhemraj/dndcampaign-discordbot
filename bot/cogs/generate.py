@@ -6,6 +6,14 @@ from discord.ext import commands
 from bot import config, db
 from bot.guard import dm_only
 from bot.generators import npc_gen, quest_gen, encounter_gen, npc_dialogue
+from bot.generators.data.npc_library import ALL_NPCS, by_tier, by_region, find_by_name
+
+_TIER_CHOICES = [
+    app_commands.Choice(name="Legendary (5)",  value="legendary"),
+    app_commands.Choice(name="Mega (10)",      value="mega"),
+    app_commands.Choice(name="Notable (20)",   value="notable"),
+    app_commands.Choice(name="Standard (150)", value="standard"),
+]
 
 _REGION_CHOICES = [
     app_commands.Choice(name="Western Wynandir",  value="Western Wynandir"),
@@ -192,6 +200,81 @@ class GenerateCog(commands.Cog, name="Generate"):
         if len(rows) > 20:
             embed.set_footer(text=f"Showing 20 of {len(rows)}")
         await interaction.response.send_message(embed=embed)
+
+    @npc_group.command(name="library", description="Browse the 185 hand-crafted NPC library")
+    @app_commands.choices(tier=_TIER_CHOICES, region=_REGION_CHOICES)
+    @dm_only()
+    async def npc_library(self, interaction: discord.Interaction, tier: str = "", region: str = ""):
+        pool = ALL_NPCS
+        if tier:
+            pool = [n for n in pool if n["tier"] == tier]
+        if region:
+            pool = [n for n in pool if region.lower() in n["region"].lower()]
+        if not pool:
+            await interaction.response.send_message("No NPCs match those filters.", ephemeral=True)
+            return
+        tier_icons = {"legendary": "🔥", "mega": "⚡", "notable": "✨", "standard": "·"}
+        embed = discord.Embed(
+            title=f"NPC Library — {len(pool)} characters",
+            description="Use `/npc summon <name>` to add one to your campaign.",
+            colour=0xD4A040,
+        )
+        for n in pool[:20]:
+            icon = tier_icons.get(n["tier"], "·")
+            embed.add_field(
+                name=f"{icon} {n['name']}",
+                value=f"{n['race']} {n['suggested_class']} · {n.get('faction') or 'None'} · {n['region']}",
+                inline=False,
+            )
+        if len(pool) > 20:
+            embed.set_footer(text=f"Showing 20 of {len(pool)} — add tier or region filter to narrow")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @npc_group.command(name="summon", description="Add a library NPC to your campaign (rolls their stats)")
+    @dm_only()
+    async def npc_summon(self, interaction: discord.Interaction, name: str):
+        template = find_by_name(name)
+        if not template:
+            close = [n["name"] for n in ALL_NPCS if name.lower() in n["name"].lower()][:5]
+            hint = f"\nDid you mean: {', '.join(close)}?" if close else ""
+            await interaction.response.send_message(f"No library NPC named '{name}'.{hint}", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        cid = config.get_key(interaction.guild.id, "active_campaign_id")
+        npc = npc_gen.generate(cid, template["region"], template.get("faction"))
+        # Override procedural fields with library data
+        npc.update({
+            "name":        template["name"],
+            "race":        template["race"],
+            "npc_class":   template["suggested_class"],
+            "level":       template["suggested_level"],
+            "faction":     template.get("faction"),
+            "region":      template["region"],
+            "alignment":   template["alignment"],
+            "personality": template["personality"],
+            "ideal":       template["ideal"],
+            "bond":        template["bond"],
+            "flaw":        template["flaw"],
+            "backstory":   template["backstory"],
+        })
+        row_id = db.execute(
+            """INSERT INTO npcs
+               (campaign_id,name,race,npc_class,level,faction,region,alignment,
+                personality,ideal,bond,flaw,backstory,hp,ac,
+                str_score,dex_score,con_score,int_score,wis_score,cha_score)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (cid, npc["name"], npc["race"], npc["npc_class"], npc["level"],
+             npc.get("faction"), npc.get("region"), npc["alignment"],
+             npc["personality"], npc["ideal"], npc["bond"], npc["flaw"],
+             npc["backstory"], npc["hp"], npc["ac"],
+             npc["str_score"], npc["dex_score"], npc["con_score"],
+             npc["int_score"], npc["wis_score"], npc["cha_score"]),
+        )
+        npc["id"] = row_id
+        tier_label = template["tier"].title()
+        embed = _npc_embed(npc)
+        embed.set_footer(text=f"Library NPC ({tier_label}) · Saved as ID {row_id} · Use /npc speak {row_id}")
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     # ── Quest ─────────────────────────────────────────────────────────────────
 

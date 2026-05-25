@@ -94,10 +94,82 @@ def _speak_ollama(system: str, question: str) -> str:
     return result["message"]["content"].strip()
 
 
-def speak(npc: dict, question: str) -> str:
-    """Return an in-character reply. Auto-selects backend from env vars.
+def _speak_template(npc: dict, question: str) -> str:
+    """Zero-dependency fallback — constructs a reply from the NPC's own character data."""
+    import random
+    q = question.lower()
+    faction   = npc.get("faction") or "no one"
+    region    = npc.get("region") or "these lands"
+    ideal     = npc.get("ideal", "")
+    flaw      = npc.get("flaw", "")
+    backstory = npc.get("backstory", "")
 
-    Priority: ANTHROPIC_API_KEY → OPENAI_API_KEY → OLLAMA_MODEL/OLLAMA_URL
+    # Use the first sentence of backstory as a hook
+    back = backstory.split(".")[0].strip() if backstory else ""
+    # Strip the ideal label ("Knowledge: X" → "X")
+    ideal_body = ideal.split(":", 1)[1].strip() if ":" in ideal else ideal
+    # Clean faction name for use in sentences
+    faction_clean = faction.replace("Former ", "").replace("The ", "the ")
+
+    faction_words = {"faction", "empire", "kryn", "dynasty", "assembly", "cobalt", "myriad", "revelry", "concord", "allegiance", "side", "serve", "loyal"}
+    personal_words = {"who are you", "your name", "yourself", "past", "where are you from", "history", "background"}
+    danger_words   = {"danger", "threat", "enemy", "fight", "war", "attack", "afraid", "risk"}
+    trust_words    = {"trust", "secret", "tell me", "honest", "truth", "hiding", "know about", "information"}
+
+    if any(w in q for w in personal_words):
+        options = [
+            f"{back}. That's enough for a stranger to know.",
+            f"I've been in {region} long enough to stop explaining myself. My choices now are what matter.",
+            f"{back}." if back else f"My past is mine. What I've chosen since is what matters.",
+            f"What I was then and what I am now are different things. Ask about now.",
+        ]
+    elif any(w in q for w in faction_words):
+        options = [
+            f"I work with {faction_clean}. What you make of that is your business.",
+            f"{faction_clean.capitalize()} is what I chose. I didn't choose it lightly.",
+            f"Every argument against {faction_clean} — I've heard the good ones. I'm still here.",
+            f"If you're asking because you want to judge me, that conversation costs more than a quick question.",
+        ]
+    elif any(w in q for w in danger_words):
+        options = [
+            f"I've survived {region}. I've survived things before that. Ask your real question.",
+            f"I don't frighten easily. What specifically are you warning me about?",
+            f"If you're threatening me, you're making a mistake. If you're warning me, I already know.",
+            f"Danger is a condition, not an event. I'm used to the condition.",
+        ]
+    elif any(w in q for w in trust_words):
+        options = [
+            f"Trust is earned slowly and lost fast. We've just met. Do the math.",
+            f"What I know isn't offered freely. What are you actually asking me for?",
+            f"I'll tell you this much: {back.lower()}." if back else "There are things I keep to myself.",
+            f"Honest? I'm as honest as the situation allows. Today it allows some.",
+        ]
+    else:
+        options = [
+            f"{ideal_body}" if ideal_body else f"I've been doing this long enough to have opinions. Ask a more specific question.",
+            f"{back}." if back else f"I've been in {region} long enough to know how these conversations go.",
+            f"I don't have a short answer to that. The long answer starts with: {back.lower()}." if back else f"That depends on what you're actually trying to find out.",
+            f"I have my reasons for being here. They're mine.",
+        ]
+
+    options = [o for o in options if o.strip() and len(o) > 15]
+    rng = random.Random(hash(question + npc.get("name", "")) & 0xFFFFFFFF)
+    reply = rng.choice(options) if options else "I don't answer that. Not today."
+
+    # Add flaw colouring on trust/personal questions, 40% of the time
+    if flaw and any(w in q for w in trust_words | personal_words):
+        flaw_first = flaw.split(".")[0].rstrip()
+        if rng.random() < 0.4:
+            reply = reply.rstrip(".") + f" — though {flaw_first.lower()}."
+
+    return reply
+
+
+def speak(npc: dict, question: str) -> str:
+    """Return an in-character reply.
+
+    Priority: ANTHROPIC_API_KEY → OPENAI_API_KEY → OLLAMA_MODEL → template fallback.
+    Template fallback requires no API key and works on all 185 library NPCs.
     """
     system = _system_prompt(npc)
 
@@ -110,6 +182,4 @@ def speak(npc: dict, question: str) -> str:
     if os.getenv("OLLAMA_MODEL") or os.getenv("OLLAMA_URL"):
         return _speak_ollama(system, question)
 
-    raise RuntimeError(
-        "No AI backend configured. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or OLLAMA_MODEL in your .env."
-    )
+    return _speak_template(npc, question)
