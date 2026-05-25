@@ -1,6 +1,6 @@
 # D&D Campaign Discord Bot
 
-A fully standalone Discord bot companion for Dungeon Masters running campaigns in **Wildemount** (Critical Role setting). Live combat tracker with HP bars and conditions, procedural NPC/quest/map generation, 185 hand-crafted library NPCs with AI in-character dialogue, voice channel turn announcements, and deploy notifications — all from Discord slash commands.
+A fully standalone Discord bot companion for Dungeon Masters running campaigns in **Wildemount** (Critical Role setting). Live combat tracker with HP bars and conditions, player character registration with spell slot tracking, procedural NPC/quest/map generation, 185 hand-crafted library NPCs with AI in-character dialogue, voice channel turn announcements, and deploy notifications — all from Discord slash commands.
 
 [![Add to Discord](https://img.shields.io/badge/Add%20to-Discord-5865F2?logo=discord&logoColor=white)](https://discord.com/api/oauth2/authorize?client_id=1507476166494392420&permissions=117760&scope=bot%20applications.commands)
 [![Live Demo](https://img.shields.io/badge/Live-Demo-7289da?logo=github)](https://tkhemraj.github.io/dndcampaign-discordbot/demo.html)
@@ -21,7 +21,7 @@ Generate fully statted Wildemount NPCs on the fly, or browse 185 hand-crafted li
 ![NPC Generator](docs/img/npc_generator.png)
 
 ### Procedural Maps
-BSP dungeon rooms, zone-based outdoor terrain, template interiors, and Wildemount-flavoured locations rendered as PNG — generated fresh every time, posted to the player channel with `/map share`.
+BSP dungeon rooms, zone-based outdoor terrain, template interiors, and Wildemount-flavoured locations rendered as PNG. The renderer uses 28px tiles with wall stone block texture, per-room ambient warmth glow, floor bevel bevels, torch spot highlights, and a vignette border — generated fresh every time, posted to the player channel with `/map share`.
 
 ![Procedural Map](docs/img/map_preview.png)
 
@@ -38,15 +38,16 @@ Configure a voice channel with `/setup voice_channel` and the bot joins automati
 
 | Feature | Commands | Who sees it |
 |---|---|---|
-| **Live combat tracker** | `/combat start/next/hp/end` | DM controls privately; players see live embed |
+| **Live combat tracker** | `/combat start/next/hp/initiative/end` | DM controls privately; players see live embed with 🛡️ player icons and battle summary on end |
+| **Player characters** | `/pc register/view/list/hp/update/slots/cast/rest/inspire/retire` | Players register their own PCs; auto-join combat with correct stats; spell slot tracking |
 | **Voice turn announcements** | `/setup voice_channel` | Bot joins VC on combat start, announces each turn via TTS, disconnects on end |
 | **Deploy announcements** | automatic | Posts a green embed to player channel on every restart — shows commit SHA and what changed |
-| **NPC generation + library** | `/npc generate`, `/npc library`, `/npc summon`, `/npc view`, `/npc list` | DM only (ephemeral) — procedural or hand-crafted library (185 NPCs: 5 Legendary, 10 Mega, 20 Notable, 150 Standard) |
+| **NPC generation + library** | `/npc generate`, `/npc library`, `/npc summon`, `/npc view`, `/npc list`, `/npc kill` | DM only (ephemeral) — procedural or hand-crafted library (185 NPCs: 5 Legendary, 10 Mega, 20 Notable, 150 Standard) |
 | **AI NPC dialogue** | `/npc speak <id> <question>` | Posts in-character reply to player channel — Anthropic, OpenAI-compatible, Ollama, or zero-dependency template fallback |
-| **Quest board** | `/quest generate`, `/quest board` | DM generates; board posts to player channel |
-| **Procedural maps** | `/map generate`, `/map share` | DM previews privately; share posts PNG to channel |
+| **Quest board** | `/quest generate`, `/quest board`, `/quest complete` | DM generates; board posts to player channel |
+| **Procedural maps** | `/map generate`, `/map share` | DM previews privately; share posts PNG to channel — 28px tiles, wall stone texture, warmth glow |
 | **Session recaps** | `/session log` | Posts rich embed to player channel |
-| **Encounter builder** | `/encounter generate` | DM only (ephemeral) — named from roster, ready for `/combat start` |
+| **Encounter builder** | `/encounter generate`, `/encounter list` | DM only (ephemeral) — named from roster, ready for `/combat start` |
 | **Loot generator** | `/loot generate`, `/loot share`, `/loot list` | DM generates CR-aware Wildemount treasure (gems, art, magic items Common→Legendary); share to player channel |
 | **Dice roller** | `/roll` | Any player or the DM — full expression support with advantage, keep-highest, and secret rolls |
 | **Multi-campaign** | `/campaign new/select` | Multiple campaigns per server |
@@ -121,11 +122,14 @@ Both gates can be active simultaneously — useful for having a `#dm-commands` c
 | `/npc library [tier] [region]` | Browse the 185-NPC hand-crafted library — filter by tier (Legendary/Mega/Notable/Standard) or region |
 | `/npc summon <name>` | Pull any library NPC into your campaign DB with freshly rolled stats |
 | `/npc speak <id> <question>` | Ask a saved NPC a question — AI reply posted publicly to player channel (Anthropic → OpenAI-compat → Ollama → template) |
-| `/npc view <id>` | View a saved NPC's full stat card by ID |
+| `/npc view <id>` | View a saved NPC's full stat card by ID (6-field inline stat block) |
 | `/npc list [status]` | List saved NPCs (status: Alive / Dead / Unknown) |
+| `/npc kill <id>` | Mark an NPC as dead |
 | `/quest generate [region] [faction]` | Generate + save a quest hook (ephemeral) — region and faction are dropdown-autocompleted |
-| `/quest board` | Post all active quests → player channel |
+| `/quest board` | Post all active quests → player channel (single consolidated embed) |
+| `/quest complete <id>` | Mark a quest as completed |
 | `/encounter generate [size] [level] [difficulty]` | Generate + save an encounter — named from its actual roster (e.g. "Ambush: 3× Gnoll, Gnoll Pack Lord") |
+| `/encounter list` | List recent encounters with status |
 
 </details>
 
@@ -145,15 +149,37 @@ Both gates can be active simultaneously — useful for having a `#dm-commands` c
 
 | Command | Description |
 |---|---|
-| `/combat start <encounter_id>` | Start combat — posts live embed to player channel |
+| `/combat start <encounter_id> [with_party]` | Start combat — posts live embed to player channel; `with_party:True` auto-imports registered PCs with correct HP/AC |
 | `/combat next` | Advance turn (embed updates live) |
 | `/combat hp <name> <delta>` | Heal or damage (`+5`, `-12`) |
+| `/combat initiative <name> <value>` | Set or override a combatant's initiative |
 | `/combat add <name> <hp> [ac] [initiative]` | Add combatant mid-fight |
 | `/combat condition <name> <condition>` | Apply/remove a condition — all 15 D&D 5e conditions autocompleted |
 | `/combat notes <name> <notes>` | Set combatant notes |
 | `/combat remove <name>` | Remove a combatant |
 | `/combat status` | View tracker privately |
-| `/combat end` | End combat (embed turns green) |
+| `/combat end` | End combat — embed turns green, shows rounds fought and fallen combatants |
+
+</details>
+
+<details>
+<summary>Player Characters</summary>
+
+| Command | Description |
+|---|---|
+| `/pc register <name> [race] [class] [level] [hp] [ac] [stats…]` | Register your character for the active campaign |
+| `/pc view [name]` | View your own character sheet (or any by name) — shows HP bar, spell slots |
+| `/pc list` | List all active PCs in the campaign |
+| `/pc hp <delta>` | Update your own HP (`+8` heal, `-12` damage) |
+| `/pc update [name] [field] [value]` | Update character fields (DM can update any PC; players update their own) |
+| `/pc slots <level1_max> [level2_max] …` | Set spell slot maximums |
+| `/pc cast <slot_level>` | Expend a spell slot |
+| `/pc rest` | Long rest — resets HP to max and refills all spell slots |
+| `/pc inspire` | Toggle inspiration on/off |
+| `/pc retire <name>` | Retire a character (DM only) |
+
+Spell slots are stored as JSON per level: `{"1": [current, max], "2": [current, max], …}`.  
+HP bar displays as `█████░░░░░` (10-block bar). Registered PCs auto-join combat when `/combat start with_party:True` is used.
 
 </details>
 

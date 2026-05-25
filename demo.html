@@ -655,11 +655,12 @@
 <section class="hero">
   <div class="hero-content">
     <h1>D&amp;D Campaign<br><span>Discord Bot</span></h1>
-    <p>A fully standalone bot companion for Dungeon Masters. Live combat tracker, voice turn announcements, procedural NPC/quest/map generation, 185 hand-crafted library NPCs with AI in-character dialogue — all from Discord slash commands.</p>
+    <p>A fully standalone bot companion for Dungeon Masters. Live combat tracker, player character registration with spell slots, voice turn announcements, procedural NPC/quest/map generation, 185 hand-crafted library NPCs with AI in-character dialogue — all from Discord slash commands.</p>
     <div class="hero-badges">
       <span class="badge badge-brand">⚔️ Wildemount Ready</span>
       <span class="badge badge-outline badge-dot">Live on Discord</span>
       <span class="badge badge-outline">185 Library NPCs</span>
+      <span class="badge badge-outline">Player Characters</span>
       <span class="badge badge-outline">Open Source</span>
     </div>
   </div>
@@ -906,10 +907,10 @@
   <div class="shipped-inner">
     <span class="shipped-label">Recently shipped</span>
     <div class="shipped-items">
-      <span class="shipped-item"><span class="si-dot"></span>/loot generate — CR-aware Wildemount treasure with magic items</span>
-      <span class="shipped-item"><span class="si-dot"></span>Map overhaul — 22px tiles, textured floors, wall depth</span>
-      <span class="shipped-item"><span class="si-dot"></span>/roll — full dice expression support with adv/dis</span>
-      <span class="shipped-item"><span class="si-dot"></span>185 library NPCs + /npc speak AI dialogue (no key needed)</span>
+      <span class="shipped-item"><span class="si-dot"></span>Player Characters — /pc register, spell slots, HP bar, auto-join combat</span>
+      <span class="shipped-item"><span class="si-dot"></span>Map renderer — 28px tiles, wall stone, warmth glow, torch spots, vignette</span>
+      <span class="shipped-item"><span class="si-dot"></span>/combat initiative + battle summary + 🛡️ player icons</span>
+      <span class="shipped-item"><span class="si-dot"></span>/npc kill · /quest complete · /encounter list</span>
     </div>
   </div>
 </div>
@@ -918,11 +919,12 @@
   <div class="feature-card">
     <div class="feature-icon">🗡️</div>
     <div class="feature-name">Combat Tracker</div>
-    <div class="feature-desc">Live embed posted to the player channel. Updates silently on every DM action — turn advances, HP changes, conditions, and notes.</div>
+    <div class="feature-desc">Live embed posted to the player channel. Updates silently on every DM action — turn advances, HP changes, conditions, and notes. 🛡️ icons for registered player characters. Battle summary on end.</div>
     <div class="feature-commands">
       <span class="cmd-chip">/combat start</span>
       <span class="cmd-chip">/combat next</span>
       <span class="cmd-chip">/combat hp</span>
+      <span class="cmd-chip">/combat initiative</span>
       <span class="cmd-chip">/combat condition</span>
       <span class="cmd-chip">/combat end</span>
     </div>
@@ -930,7 +932,7 @@
   <div class="feature-card">
     <div class="feature-icon">🧙</div>
     <div class="feature-name">NPC Generator + Library</div>
-    <div class="feature-desc">Procedural NPCs with full Wildemount stats, or browse 185 hand-crafted characters — 5 Legendary, 10 Mega, 20 Notable, 150 Standard. Summon any into your campaign and ask them questions. AI dialogue via Anthropic, OpenAI-compatible, Ollama, or zero-dependency template fallback.</div>
+    <div class="feature-desc">Procedural NPCs with full Wildemount stats, or browse 185 hand-crafted characters — 5 Legendary, 10 Mega, 20 Notable, 150 Standard. Summon any into your campaign and ask them questions. AI dialogue via Anthropic, OpenAI-compatible, Ollama, or zero-dependency template fallback. Track NPC deaths.</div>
     <div class="feature-commands">
       <span class="cmd-chip">/npc generate</span>
       <span class="cmd-chip">/npc library</span>
@@ -938,21 +940,23 @@
       <span class="cmd-chip">/npc speak</span>
       <span class="cmd-chip">/npc view</span>
       <span class="cmd-chip">/npc list</span>
+      <span class="cmd-chip">/npc kill</span>
     </div>
   </div>
   <div class="feature-card">
     <div class="feature-icon">📜</div>
     <div class="feature-name">Quest Generator</div>
-    <div class="feature-desc">Procedural quest hooks with Wildemount faction flavour. Colour-coded by difficulty. Post the active board to players on demand.</div>
+    <div class="feature-desc">Procedural quest hooks with Wildemount faction flavour. Colour-coded by difficulty. Post the active board to players as a single consolidated embed. Mark quests complete when done.</div>
     <div class="feature-commands">
       <span class="cmd-chip">/quest generate</span>
       <span class="cmd-chip">/quest board</span>
+      <span class="cmd-chip">/quest complete</span>
     </div>
   </div>
   <div class="feature-card">
     <div class="feature-icon">🗺️</div>
     <div class="feature-name">Map Generator</div>
-    <div class="feature-desc">BSP dungeons, zone-based outdoor terrain, template interiors, and Wildemount locations. Rendered as PNG and posted to the player channel.</div>
+    <div class="feature-desc">BSP dungeons, zone-based outdoor terrain, template interiors, and Wildemount locations. 28px tiles with wall stone texture, per-room warmth glow, torch spot highlights, floor bevel, and vignette border. Rendered as PNG and posted to the player channel.</div>
     <div class="feature-commands">
       <span class="cmd-chip">/map generate</span>
       <span class="cmd-chip">/map share</span>
@@ -962,9 +966,23 @@
   <div class="feature-card">
     <div class="feature-icon">⚔️</div>
     <div class="feature-name">Encounter Generator</div>
-    <div class="feature-desc">Party-size and level-aware encounter generation. Named from its actual roster — <em>"Ambush: 3× Gnoll, Gnoll Pack Lord"</em> — and ready to start immediately with <code>/combat start</code>.</div>
+    <div class="feature-desc">Party-size and level-aware encounter generation. Named from its actual roster — <em>"Ambush: 3× Gnoll, Gnoll Pack Lord"</em> — and ready to start immediately with <code>/combat start</code>. Browse past encounters with <code>/encounter list</code>.</div>
     <div class="feature-commands">
       <span class="cmd-chip">/encounter generate</span>
+      <span class="cmd-chip">/encounter list</span>
+    </div>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon">🧝</div>
+    <div class="feature-name">Player Characters</div>
+    <div class="feature-desc">Players register their own characters with full stats, HP, and spell slots. HP bar displayed as a 10-block visual bar. Characters auto-join combat with correct stats when <code>/combat start with_party:True</code> is used — shown with a 🛡️ icon in the tracker.</div>
+    <div class="feature-commands">
+      <span class="cmd-chip">/pc register</span>
+      <span class="cmd-chip">/pc view</span>
+      <span class="cmd-chip">/pc hp</span>
+      <span class="cmd-chip">/pc cast</span>
+      <span class="cmd-chip">/pc rest</span>
+      <span class="cmd-chip">/pc inspire</span>
     </div>
   </div>
   <div class="feature-card">
@@ -1049,20 +1067,11 @@
 
 <!-- ── ROADMAP ───────────────────────────────────────────────────────── -->
 <div class="section-label">What's next</div>
-<h2 class="section-title">Ideas for v2</h2>
-<p class="section-desc">Seven things worth building next, ranked roughly by impact on the table.</p>
+<h2 class="section-title">Ideas for v3</h2>
+<p class="section-desc">Things worth building next, ranked roughly by impact on the table.</p>
 
 <div class="roadmap">
   <div class="roadmap-grid">
-
-    <div class="roadmap-card">
-      <div class="roadmap-icon ri-player">🧝</div>
-      <div class="roadmap-body">
-        <div class="roadmap-title">Player Character Registration</div>
-        <div class="roadmap-desc">Players register their own characters with <code>/character create</code>. Characters auto-join combat with correct stats, track their own HP, and appear in the tracker with a player icon rather than a monster icon.</div>
-        <span class="roadmap-tag rt-player">Player-Facing</span>
-      </div>
-    </div>
 
     <div class="roadmap-card">
       <div class="roadmap-icon ri-weather">🌦️</div>
